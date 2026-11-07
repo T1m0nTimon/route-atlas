@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
+
+Tools for full-stack developers: Route Atlas now checks your links, writes request code for you and keeps your frontend in step with your routes.
 
 - Broken links: `href`, `fetch`, `router.push`, `redirect` and Markdown links that no route answers show up in the Problems panel, with a quick fix
 - Copy a route as cURL, `fetch`, Axios or HTTPie
