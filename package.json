@@ -13,17 +13,18 @@
   "categories": ["Programming Languages", "Testing", "Other"],
   "keywords": ["routes", "endpoints", "sitemap", "api", "openapi", "flask", "nextjs", "express", "django", "laravel"],
   "main": "./src/extension.js",
+  "bin": { "route-atlas": "bin/route-atlas.js" },
   "activationEvents": ["onStartupFinished"],
   "scripts": {
-    "test": "node --test test/scanner.test.js test/features.test.js",
+    "test": "node --test test/scanner.test.js test/features.test.js test/links.test.js test/tools.test.js test/cli.test.js",
     "package": "npx --yes @vscode/vsce package --no-dependencies"
   },
   "capabilities": {
     "virtualWorkspaces": false,
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Addresses, headers and custom patterns from an untrusted workspace are ignored.",
-      "restrictedConfigurations": ["routeAtlas.baseUrl", "routeAtlas.requestHeaders", "routeAtlas.categories"]
+      "description": "Addresses, headers, custom patterns and the route helpers file from an untrusted workspace are ignored.",
+      "restrictedConfigurations": ["routeAtlas.baseUrl", "routeAtlas.requestHeaders", "routeAtlas.categories", "routeAtlas.ignoreLinks", "routeAtlas.helpersFile"]
     }
   },
   "contributes": {
@@ -60,7 +61,9 @@
       { "command": "routeAtlas.favorite", "title": "Add to Favorites", "category": "Route Atlas", "icon": "$(star-empty)" },
       { "command": "routeAtlas.unfavorite", "title": "Remove from Favorites", "category": "Route Atlas", "icon": "$(star-full)" },
       { "command": "routeAtlas.copyPath", "title": "Copy Path", "category": "Route Atlas" },
-      { "command": "routeAtlas.copyUrl", "title": "Copy Address", "category": "Route Atlas" }
+      { "command": "routeAtlas.copyUrl", "title": "Copy Address", "category": "Route Atlas" },
+      { "command": "routeAtlas.copyAs", "title": "Copy as cURL, fetch, Axios...", "category": "Route Atlas" },
+      { "command": "routeAtlas.generateHelpers", "title": "Generate TypeScript Route Helpers", "category": "Route Atlas", "icon": "$(symbol-namespace)" }
     ],
     "keybindings": [
       { "command": "routeAtlas.search", "key": "ctrl+alt+r", "mac": "cmd+alt+r" }
@@ -74,6 +77,7 @@
         { "command": "routeAtlas.checkAll", "when": "view == routeAtlas.routes", "group": "navigation@4" },
         { "command": "routeAtlas.export", "when": "view == routeAtlas.routes", "group": "1_tools@1" },
         { "command": "routeAtlas.setServer", "when": "view == routeAtlas.routes", "group": "1_tools@2" },
+        { "command": "routeAtlas.generateHelpers", "when": "view == routeAtlas.routes", "group": "1_tools@2" },
         { "command": "routeAtlas.refresh", "when": "view == routeAtlas.routes", "group": "1_tools@3" }
       ],
       "view/item/context": [
@@ -84,7 +88,8 @@
         { "command": "routeAtlas.favorite", "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)$/", "group": "2_favorite" },
         { "command": "routeAtlas.unfavorite", "when": "view == routeAtlas.routes && viewItem =~ /\\.favorite$/", "group": "2_favorite" },
         { "command": "routeAtlas.copyPath", "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/", "group": "3_copy@1" },
-        { "command": "routeAtlas.copyUrl", "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/", "group": "3_copy@2" }
+        { "command": "routeAtlas.copyUrl", "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/", "group": "3_copy@2" },
+        { "command": "routeAtlas.copyAs", "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/", "group": "3_copy@3" }
       ],
       "commandPalette": [
         { "command": "routeAtlas.open", "when": "false" },
@@ -93,7 +98,8 @@
         { "command": "routeAtlas.favorite", "when": "false" },
         { "command": "routeAtlas.unfavorite", "when": "false" },
         { "command": "routeAtlas.copyPath", "when": "false" },
-        { "command": "routeAtlas.copyUrl", "when": "false" }
+        { "command": "routeAtlas.copyUrl", "when": "false" },
+        { "command": "routeAtlas.copyAs", "when": "false" }
       ]
     },
     "configuration": {
@@ -139,6 +145,22 @@
           "type": "boolean",
           "default": true,
           "description": "Report routes handled twice and admin routes without a login check in the Problems panel."
+        },
+        "routeAtlas.brokenLinks": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Report links such as `href=\"/x\"`, `fetch(\"/api/x\")` or `redirect(\"/x\")` that no route answers. Needs `#routeAtlas.diagnostics#`."
+        },
+        "routeAtlas.ignoreLinks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "Regular expressions for paths that are never reported as broken, for example `^/api/` when the API runs in another project."
+        },
+        "routeAtlas.helpersFile": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Keep TypeScript route helpers in this file up to date, for example `src/routes.gen.ts`. The path is relative to the workspace folder. Empty: only on demand."
         },
         "routeAtlas.language": {
           "type": "string",

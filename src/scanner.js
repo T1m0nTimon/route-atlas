@@ -762,4 +762,4 @@ async function scan(root, options = {}) {
   return merge(routes.length ? routes : scanStatic(root, files));
 }
 
-module.exports = { scan, normalize, SKIP_DIRS };
+module.exports = { scan, normalize, SKIP_DIRS, walk, read, isTestFile, stripComments };

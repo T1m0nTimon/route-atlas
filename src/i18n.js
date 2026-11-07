@@ -46,6 +46,15 @@ const GERMAN = {
   "Handled twice": "Doppelt belegt",
   "Open in browser": "Im Browser öffnen",
   "Send request": "Anfrage senden",
+  "No route answers {0}.": "Keine Seite antwortet auf {0}.",
+  "Did you mean {0}?": "Meintest du {0}?",
+  "Change to {0}": "Ändern in {0}",
+  "Copy {0} as": "{0} kopieren als",
+  "Copied {0} {1} as {2}": "{0} {1} als {2} kopiert",
+  "Save route helpers": "Routen-Helfer speichern",
+  "Keep it up to date": "Aktuell halten",
+  "Update {0} whenever routes change?": "{0} bei jeder Änderung der Seiten aktualisieren?",
+  "Could not write {0}: {1}": "{0} konnte nicht geschrieben werden: {1}",
 };
 
 function createTranslator(language) {

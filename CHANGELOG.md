@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Broken links: `href`, `fetch`, `router.push`, `redirect` and Markdown links that no route answers show up in the Problems panel, with a quick fix
+- Copy a route as cURL, `fetch`, Axios or HTTPie
+- Generate typed TypeScript route helpers, on demand or kept up to date through `routeAtlas.helpersFile`
+- Command line tool `route-atlas` with `list`, `export`, `check` and `lint`, for scripts and CI
 - Follow more prefixes: routers mounted in the same file, named imports, files like `user.routes.js`, Fastify `register` options, nested `include_router` and Django `include`
 - Flask: a `url_prefix` at registration replaces the one of the blueprint
 - Python: imports over several lines and relative imports find the right module

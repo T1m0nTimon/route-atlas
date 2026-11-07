@@ -6,6 +6,9 @@ const vscode = require("vscode");
 const { scan, SKIP_DIRS } = require("./scanner");
 const { MODES, findings, matchRoute } = require("./tree");
 const { FORMATS } = require("./exporters");
+const { scanLinks } = require("./links");
+const { SNIPPETS } = require("./snippets");
+const { toTypeScript } = require("./typed");
 const { findServer, send, checkAll, checkable, isLocal } = require("./http");
 const { createTranslator, resolveLanguage } = require("./i18n");
 const { RouteTree } = require("./view");
@@ -59,6 +62,7 @@ function activate(context) {
   const lensChanged = new vscode.EventEmitter();
   const documents = new Map();
   const documentChanged = new vscode.EventEmitter();
+  const linkFixes = new Map();
   statusBar.command = "routeAtlas.search";
   let timer;
   let running = false;
@@ -84,8 +88,26 @@ function activate(context) {
   const showFindings = () => {
     problems.clear();
     tree.warnings.clear();
+    linkFixes.clear();
     if (!config().get("diagnostics")) return;
     const perFile = new Map();
+    const report = (file, diagnostic) => {
+      if (!perFile.has(file)) perFile.set(file, []);
+      perFile.get(file).push(diagnostic);
+    };
+    for (const link of tree.results.flatMap((result) => result.links || [])) {
+      const range = new vscode.Range(link.line, link.column, link.line, link.column + link.length);
+      const hint = link.suggestion ? ` ${t("Did you mean {0}?", link.suggestion.path)}` : "";
+      const diagnostic = new vscode.Diagnostic(range, t("No route answers {0}.", link.path) + hint, vscode.DiagnosticSeverity.Warning);
+      diagnostic.source = "Route Atlas";
+      diagnostic.code = "broken-link";
+      if (link.suggestion && link.suggestion.replacement && !/[$}{<%]/.test(link.value)) {
+        // Keep the query and the anchor of the original link.
+        const kept = link.value.slice(link.value.split(/[?#]/)[0].replace(/\/$/, "").length);
+        linkFixes.set(`${vscode.Uri.file(link.file).toString()}|${link.line}|${link.column}`, link.suggestion.replacement + kept);
+      }
+      report(link.file, diagnostic);
+    }
     for (const result of tree.results) {
       for (const finding of findings(result.routes, config().get("categories"))) {
         const conflict = finding.type === "conflict";
@@ -100,8 +122,7 @@ function activate(context) {
           conflict ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Information,
         );
         diagnostic.source = "Route Atlas";
-        if (!perFile.has(finding.file)) perFile.set(finding.file, []);
-        perFile.get(finding.file).push(diagnostic);
+        report(finding.file, diagnostic);
         const key = tree.key(result, finding.route);
         tree.warnings.set(key, [...(tree.warnings.get(key) || []), t(conflict ? "Handled twice" : "No login check found")]);
       }
@@ -123,6 +144,13 @@ function activate(context) {
           return { folder, routes, ...(await locateServer(folder, routes)) };
         }),
       );
+      // In a multi-root workspace the frontend may link to routes of another folder.
+      const known = tree.results.flatMap((result) => result.routes);
+      if (config().get("diagnostics") && config().get("brokenLinks")) {
+        const ignore = vscode.workspace.isTrusted ? config().get("ignoreLinks") : [];
+        for (const result of tree.results) result.links = await scanLinks(result.folder.uri.fsPath, known, { exclude, ignore });
+      }
+      await writeHelpers();
       showFindings();
       tree.refresh();
       lensChanged.fire();
@@ -219,6 +247,72 @@ function activate(context) {
     }
   };
 
+  const helpersTarget = (result) => {
+    const setting = vscode.workspace.isTrusted ? config().get("helpersFile") : "";
+    if (!setting) return undefined;
+    const folder = result.folder.uri.fsPath;
+    const file = path.resolve(folder, setting);
+    const relative = path.relative(folder, file);
+    return relative.startsWith("..") || path.isAbsolute(relative) ? undefined : file;
+  };
+
+  /** Keeps the file from `routeAtlas.helpersFile` in step with the routes. */
+  const writeHelpers = async () => {
+    for (const result of tree.results) {
+      const file = helpersTarget(result);
+      if (!file || !result.routes.length) continue;
+      const content = toTypeScript(result.routes);
+      try {
+        if ((await fs.readFile(file, "utf8")) === content) continue;
+      } catch {
+        // Not written yet.
+      }
+      try {
+        await fs.mkdir(path.dirname(file), { recursive: true });
+        await fs.writeFile(file, content);
+      } catch (error) {
+        vscode.window.showWarningMessage(t("Could not write {0}: {1}", file, error.message));
+      }
+    }
+  };
+
+  const generateHelpers = async () => {
+    const [result] = tree.results;
+    if (!result || !result.routes.length) return;
+    const suggested = helpersTarget(result) || path.join(result.folder.uri.fsPath, "src", "routes.gen.ts");
+    const uri = await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(suggested), filters: { TypeScript: ["ts"] }, title: t("Save route helpers") });
+    if (!uri) return;
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(toTypeScript(result.routes)));
+    await vscode.window.showTextDocument(uri);
+    const relative = path.relative(result.folder.uri.fsPath, uri.fsPath).split(path.sep).join("/");
+    if (relative.startsWith("..") || path.isAbsolute(relative) || config().get("helpersFile") === relative) return;
+    const keep = t("Keep it up to date");
+    if ((await vscode.window.showInformationMessage(t("Update {0} whenever routes change?", relative), keep)) === keep) {
+      await config().update("helpersFile", relative, vscode.ConfigurationTarget.Workspace);
+    }
+  };
+
+  const copyAs = async (node) => {
+    const { route, result } = target(node);
+    const format = await vscode.window.showQuickPick(SNIPPETS, { title: t("Copy {0} as", route.path) });
+    if (!format) return;
+    let method = route.methods[0] || "GET";
+    if (route.methods.length > 1) {
+      method = await vscode.window.showQuickPick(route.methods, { title: route.path, placeHolder: t("Choose a method") });
+      if (!method) return;
+    }
+    const filled = await fillParameters(route);
+    if (filled === undefined) return;
+    let body;
+    if (!["GET", "HEAD", "OPTIONS", "DELETE"].includes(method)) {
+      body = await vscode.window.showInputBox({ title: `${method} ${route.path}`, prompt: t("Request body (optional)"), placeHolder: '{"name": "value"}' });
+      if (body === undefined) return;
+    }
+    const headers = config().get("requestHeaders") || {};
+    await vscode.env.clipboard.writeText(format.render({ method, url: result.baseUrl + filled, headers, body: body || undefined }));
+    vscode.window.setStatusBarMessage(t("Copied {0} {1} as {2}", method, filled, format.label), 4000);
+  };
+
   const openRoute = async ({ route }) => {
     const document = await vscode.workspace.openTextDocument(route.file);
     const position = new vscode.Position(route.line, 0);
@@ -269,6 +363,24 @@ function activate(context) {
         return lenses;
       },
     }),
+    vscode.languages.registerCodeActionsProvider({ scheme: "file" }, {
+      provideCodeActions(document, _range, { diagnostics }) {
+        const actions = [];
+        for (const diagnostic of diagnostics) {
+          if (diagnostic.source !== "Route Atlas" || diagnostic.code !== "broken-link") continue;
+          const { line, character } = diagnostic.range.start;
+          const replacement = linkFixes.get(`${document.uri.toString()}|${line}|${character}`);
+          if (!replacement) continue;
+          const action = new vscode.CodeAction(t("Change to {0}", replacement), vscode.CodeActionKind.QuickFix);
+          action.edit = new vscode.WorkspaceEdit();
+          action.edit.replace(document.uri, diagnostic.range, replacement);
+          action.diagnostics = [diagnostic];
+          action.isPreferred = true;
+          actions.push(action);
+        }
+        return actions;
+      },
+    }, { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] }),
     vscode.languages.registerDefinitionProvider({ scheme: "file" }, {
       provideDefinition(document, position) {
         const range = document.getWordRangeAtPosition(position, /["'`](?:https?:\/\/[^"'`\s]+)?\/[^"'`\s]*["'`]/);
@@ -338,6 +450,8 @@ function activate(context) {
       const { route, result } = target(node);
       tree.toggleFavorite(result, route);
     }),
+    command("copyAs", copyAs),
+    command("generateHelpers", generateHelpers),
     command("copyPath", (node) => vscode.env.clipboard.writeText(target(node).route.path)),
     command("copyUrl", async (node) => {
       const { route, result } = target(node);

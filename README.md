@@ -14,7 +14,10 @@ Every page and endpoint of your web project in one sorted tree, without any setu
 - **Check all routes.** One click calls every plain GET route and shows the status in the tree. Routes with parameters and paths such as `/logout` or `/delete` are left out.
 - **Finds your server.** Looks at `PORT` in `.env`, the framework's default port and common ports.
 - **Finds problems.** Routes handled twice, and admin routes without a login check, show up in the Problems panel.
-- **Export.** Markdown, OpenAPI 3, `.http`, JSON and `sitemap.xml`.
+- **Finds broken links.** `href="/abuot"`, `fetch("/api/itemz")`, `router.push(...)` or `redirect(...)` that no route answers are marked in the code, with a quick fix to the route you probably meant. Works in JSX, Vue, Svelte, Astro, HTML, Jinja, PHP, Python and Markdown.
+- **Copy as code.** Right-click a route and copy it as cURL, `fetch`, Axios or HTTPie, with the server address, your headers and the parameters you filled in.
+- **Typed route helpers.** Generate a `routes.gen.ts` with one function per route, so `routes.usersByIdEdit({ id: 42 })` gives `/users/42/edit` and a renamed route breaks the build instead of the link. Set `routeAtlas.helpersFile` and it stays up to date.
+- **Export.** Markdown, OpenAPI 3, `.http`, JSON, `sitemap.xml` and TypeScript route helpers.
 - **Favorites**, a filter, and live updates when you save.
 
 ## Supported
@@ -26,9 +29,29 @@ Every page and endpoint of your web project in one sorted tree, without any setu
 
 Prefixes from blueprints, routers and `app.use("/api", ...)` are followed across files. Monorepos and multi-root workspaces work.
 
+## Command line
+
+The same scanner works without VS Code, for scripts and CI. It needs Node.js 20 or newer and has no dependencies.
+
+```bash
+npx github:T1m0nTimon/route-atlas list            # table of all routes
+npx github:T1m0nTimon/route-atlas lint            # broken links, routes handled twice, admin without login check
+npx github:T1m0nTimon/route-atlas export openapi --base-url https://example.com -o openapi.json
+npx github:T1m0nTimon/route-atlas export typescript -o src/routes.gen.ts
+npx github:T1m0nTimon/route-atlas check --base-url http://127.0.0.1:3000
+```
+
+`list`, `lint` and `check` take `--json`. `lint` and `check` exit with 1 when they find something, so they can fail a CI job. `check` only calls plain GET routes without parameters and skips paths such as `/logout`; `--fail-on 400` also counts client errors, `--header "Authorization: Bearer ..."` adds a header. `--ignore-link <regex>` hides links that `lint` should not report. Run `route-atlas --help` for everything.
+
+Example GitHub Actions step:
+
+```yaml
+- run: npx --yes github:T1m0nTimon/route-atlas lint
+```
+
 ## Limits
 
-Route Atlas reads your source code and never runs it, so routes built at runtime are missing. The login check is a hint: it recognizes common decorators and middleware, not every way to protect a route.
+Route Atlas reads your source code and never runs it, so routes built at runtime are missing. The login check is a hint: it recognizes common decorators and middleware, not every way to protect a route. The link check only looks at addresses written as a plain string or template in known places; links pieced together with `+`, files from a `public` folder and rewrites in the server config are not checked.
 
 ## Settings
 
@@ -40,6 +63,9 @@ Route Atlas reads your source code and never runs it, so routes built at runtime
 | `routeAtlas.exclude` | More folders to skip |
 | `routeAtlas.codeLens` | Send buttons above routes in the code |
 | `routeAtlas.diagnostics` | Entries in the Problems panel |
+| `routeAtlas.brokenLinks` | Report links that no route answers |
+| `routeAtlas.ignoreLinks` | Regular expressions for paths that are never reported, for example `^/api/` |
+| `routeAtlas.helpersFile` | Keep TypeScript route helpers in this file up to date, for example `src/routes.gen.ts` |
 | `routeAtlas.language` | `auto`, `en` or `de` |
 
 ## Privacy
