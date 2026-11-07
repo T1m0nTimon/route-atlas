@@ -1,4 +1,5 @@
 test/**
 .gitignore
+.github/**
 *.vsix
 media/screenshot.png

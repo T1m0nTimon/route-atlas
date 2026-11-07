@@ -1,6 +1,7 @@
 "use strict";
 
 const { categorize } = require("./categories");
+const { toTypeScript } = require("./typed");
 
 function methodsOf(route) {
   return route.methods.length ? route.methods.filter((method) => method !== "WS" && method !== "ALL") : ["GET"];
@@ -67,6 +68,7 @@ const FORMATS = [
   { id: "http", label: ".http", language: "http", render: toHttpFile },
   { id: "json", label: "JSON", language: "json", render: toJson },
   { id: "sitemap", label: "sitemap.xml", language: "xml", render: toSitemap },
+  { id: "typescript", label: "TypeScript route helpers", language: "typescript", render: toTypeScript },
 ];
 
 module.exports = { FORMATS };

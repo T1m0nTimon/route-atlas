@@ -183,3 +183,95 @@ test("categories", () => {
 test("a broken custom pattern does not stop the sorting", () => {
   assert.equal(categorize([{ path: "/x", methods: [], kind: "page" }], [{ label: "Kaputt", pattern: "(" }])[0].label, "Pages");
 });
+
+test("express prefixes survive dotted file names, named imports and routers in one file", async () => {
+  assert.deepEqual(
+    await paths({
+      "app.js": 'const users = require("./routes/user.routes");\nimport { router as shop } from "./shop";\nconst { items } = require("./items");\napp.use("/api/users", users);\napp.use("/shop", shop);\napp.use("/items", items);\n',
+      "routes/user.routes.js": 'const router = require("express").Router();\nrouter.get("/list", h);\n',
+      "shop.js": 'export const router = express.Router();\nrouter.get("/cart", h);\n',
+      "items.js": 'const items = express.Router();\nitems.get("/all", h);\n',
+      "local.js": 'const api = express.Router();\nconst v1 = express.Router();\nv1.get("/x", h);\napi.use("/v1", v1);\napp.use("/local", api);\napp.get("/top", h);\n',
+    }),
+    ["/api/users/list", "/items/all", "/local/v1/x", "/shop/cart", "/top"],
+  );
+});
+
+test("a router mounted through another router keeps both prefixes", async () => {
+  assert.deepEqual(
+    await paths({
+      "app.js": 'const api = require("./api");\napp.use("/api", api);\n',
+      "api.js": 'const users = require("./users");\nconst router = express.Router();\nconst v1 = express.Router();\nv1.use("/users", users);\nrouter.use("/v1", v1);\nmodule.exports = router;\n',
+      "users.js": 'const router = express.Router();\nrouter.get("/list", h);\n',
+    }),
+    ["/api/v1/users/list"],
+  );
+});
+
+test("fastify plugins take their prefix from the options", async () => {
+  assert.deepEqual(
+    await paths({
+      "app.js": 'const fastify = require("fastify")();\nconst routes = require("./routes");\nfastify.register(routes, { prefix: "/api" });\nfastify.register(require("./admin"), { logLevel: "warn", prefix: "/admin" });\n',
+      "routes.js": 'module.exports = async function (fastify) {\n  fastify.get("/list", h);\n};\n',
+      "admin.js": 'module.exports = async function (fastify) {\n  fastify.get("/stats", h);\n};\n',
+    }),
+    ["/admin/stats", "/api/list"],
+  );
+});
+
+test("python routers mounted in their own file keep the prefix and do not clash", async () => {
+  const routes = await scan(
+    await project({
+      "a.py": 'from flask import Flask, Blueprint\napp = Flask(__name__)\nusers = Blueprint("u", __name__)\nitems = Blueprint("i", __name__)\n@users.get("/")\ndef a():\n    pass\n\n\n\n@items.get("/")\ndef b():\n    pass\napp.register_blueprint(users, url_prefix="/users")\napp.register_blueprint(items, url_prefix="/items")\n',
+      "b.py": 'from fastapi import FastAPI, APIRouter\napp = FastAPI()\nrouter = APIRouter(prefix="/own")\n@router.get("/x")\ndef x():\n    pass\napp.include_router(router, prefix="/api")\n',
+    }),
+  );
+  assert.deepEqual(routes.map((route) => route.path), ["/api/own/x", "/items", "/users"]);
+  assert.ok(routes.every((route) => !route.conflicts.length));
+});
+
+test("flask replaces the blueprint prefix when it is set at registration", async () => {
+  assert.deepEqual(
+    await paths({
+      "a.py": 'from flask import Flask\nfrom .v import bp\napp = Flask(__name__)\napp.register_blueprint(bp, url_prefix="/b")\n',
+      "v.py": 'from flask import Blueprint\nbp = Blueprint("v", __name__, url_prefix="/a")\n@bp.get("/x")\ndef x():\n    pass\n',
+    }),
+    ["/b/x"],
+  );
+});
+
+test("fastapi follows routers through several include_router calls", async () => {
+  assert.deepEqual(
+    await paths({
+      "main.py": 'from fastapi import FastAPI\nfrom api import api_router\napp = FastAPI()\napp.include_router(api_router, prefix="/api/v1")\n',
+      "api.py": 'from fastapi import APIRouter\nfrom users import router as users_router\nimport items\napi_router = APIRouter()\napi_router.include_router(users_router, prefix="/users")\napi_router.include_router(items.router)\n',
+      "users.py": 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/x")\ndef x():\n    pass\n',
+      "items.py": 'from fastapi import APIRouter\nrouter = APIRouter(prefix="/items")\n@router.get("/y")\ndef y():\n    pass\n',
+    }),
+    ["/api/v1/items/y", "/api/v1/users/x"],
+  );
+});
+
+test("python imports work over several lines and relative to the package", async () => {
+  assert.deepEqual(
+    await paths({
+      "shop/__init__.py": 'from flask import Flask\nfrom .views import (\n    bp,  # the shop\n    other,\n)\nfrom . import extra\nfrom . import main as main_blueprint\napp = Flask(__name__)\napp.register_blueprint(bp, url_prefix="/shop")\napp.register_blueprint(extra.bp, url_prefix="/extra")\napp.register_blueprint(main_blueprint, url_prefix="/main")\n',
+      "shop/views.py": 'from flask import Blueprint\nbp = Blueprint("v", __name__)\nother = 1\n@bp.get("/x")\ndef x():\n    pass\n',
+      "shop/extra.py": 'from flask import Blueprint\nbp = Blueprint("e", __name__)\n@bp.get("/e")\ndef e():\n    pass\n',
+      "shop/main.py": 'from flask import Blueprint\nmain = Blueprint("m", __name__)\n@main.get("/m")\ndef m():\n    pass\n',
+      "blog/views.py": 'from flask import Blueprint\nbp = Blueprint("b", __name__)\n@bp.get("/post")\ndef p():\n    pass\n',
+    }),
+    ["/extra/e", "/main/m", "/post", "/shop/x"],
+  );
+});
+
+test("django follows nested includes", async () => {
+  assert.deepEqual(
+    await paths({
+      "proj/urls.py": 'urlpatterns = [path("api/", include("api.urls"))]\n',
+      "api/urls.py": 'urlpatterns = [path("v1/", include("users.urls"))]\n',
+      "users/urls.py": 'urlpatterns = [path("users/", view)]\n',
+    }),
+    ["/api/v1/users"],
+  );
+});
