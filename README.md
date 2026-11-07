@@ -4,6 +4,15 @@ Every page and endpoint of your web project in one sorted tree, without any setu
 
 ![The route tree of a small shop](media/screenshot.png)
 
+## New in 0.3
+
+- **Broken links, found while you type.** A link to `/abuot` or a `fetch("/api/itemz")` is underlined, and one click changes it to the route you meant.
+- **Copy as cURL, fetch, Axios or HTTPie.** Right-click a route and paste a ready request into your terminal or code.
+- **Typed route helpers.** `routes.usersByIdEdit({ id: 42 })` instead of hand-written strings, regenerated whenever your routes change.
+- **On the command line and in CI.** `npx github:T1m0nTimon/route-atlas lint` fails the build when a link leads nowhere.
+
+See the [changelog](CHANGELOG.md) for everything.
+
 ## Features
 
 - **Sorted tree.** Everything below `/admin` hangs under Admin, everything below `/api` under API, down to `/users/:id/edit`. Areas for auth, account, legal and system pages are built in, and any other path that appears twice gets its own group.
@@ -77,5 +86,5 @@ Route Atlas collects nothing and has no telemetry. It only connects to the serve
 ```
 npm test
 npm run package
-code --install-extension route-atlas-0.2.1.vsix
+code --install-extension route-atlas-0.3.0.vsix
 ```
