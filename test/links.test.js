@@ -32,7 +32,7 @@ test("links are found in JSX, templates, calls and markdown", () => {
     ["/about", "/users/x", "/api/items", "/users/7/edit", "/api/items", "/login", "/docs"],
   );
   assert.deepEqual({ line: links[0].line, column: links[0].column, length: links[0].length }, { line: 1, column: 12, length: 6 });
-  assert.deepEqual(extractLinks("See [the docs](/docs/start) and\n```\n[x](/inside-code)\n```", ".md").map((link) => link.path), ["/docs/start"]);
+  assert.deepEqual(extractLinks("See [the docs](/docs/start) and `href=\"/code\"`\n```\n[x](/inside-code)\n```", ".md").map((link) => link.path), ["/docs/start"]);
   assert.deepEqual(extractLinks('<a href="/a">\n<!-- <a href="/hidden"> -->\n<form action="/b">', ".html").map((link) => link.path), ["/a", "/b"]);
   assert.deepEqual(extractLinks('return redirect("/dashboard")\nRedirectResponse(url="/home")', ".py").map((link) => link.path), ["/dashboard", "/home"]);
 });

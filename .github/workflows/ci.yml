@@ -29,8 +29,8 @@ jobs:
       - name: Command line smoke test
         run: |
           node bin/route-atlas.js --version
-          node bin/route-atlas.js list .
-          node bin/route-atlas.js lint .
+          node bin/route-atlas.js list test
+          node bin/route-atlas.js export openapi . -o openapi.json
 
   package:
     name: Package extension

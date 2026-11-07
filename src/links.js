@@ -64,7 +64,7 @@ function position(starts, index) {
 /** Every address in `text` that points into this app, with its place. */
 function extractLinks(text, ext) {
   let clean = stripComments(text, ext).replace(/<!--[\s\S]*?-->/g, blank);
-  if (ext === ".md" || ext === ".mdx") clean = clean.replace(/```[\s\S]*?```/g, blank);
+  if (ext === ".md" || ext === ".mdx") clean = clean.replace(/```[\s\S]*?```/g, blank).replace(/`[^`\n]*`/g, blank);
   const starts = lineStarts(clean);
   const found = [];
   const seen = new Set();
