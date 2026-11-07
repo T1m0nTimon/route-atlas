@@ -149,9 +149,10 @@ function pythonPrefixes(text) {
 
 function pythonImports(text) {
   const imports = {};
-  const pattern = /^\s*from\s+([\w.]+)\s+import\s+\(?([^)\n]+)/gm;
+  const pattern = /^\s*from\s+([\w.]+)\s+import\s+(\([^)]*\)|[^\n]+)/gm;
   for (let match; (match = pattern.exec(text)); ) {
-    for (const piece of match[2].split(",")) {
+    const names = match[2].replace(/#.*/g, "").replace(/[()]/g, "");
+    for (const piece of names.split(",")) {
       const [name, alias] = piece.trim().split(/\s+as\s+/);
       if (name) imports[alias || name] = { module: match[1], name };
     }
@@ -195,42 +196,70 @@ function scanPython(file, text, context) {
 
 /** Applies Blueprint and router prefixes, including those set in another file. */
 function applyPythonPrefixes(routes, context, root) {
-  const moduleFile = (module) => {
-    const tail = module.replace(/^\.+/, "").replace(/\./g, "/");
+  const moduleName = (file) => posix(path.relative(root, file)).replace(/\.py$/, "").replace(/\/__init__$/, "");
+  const moduleFile = (module, from) => {
+    const dots = /^\.*/.exec(module)[0].length;
+    const tail = module.slice(dots).replace(/\./g, "/");
+    if (dots) {
+      let dir = path.dirname(from);
+      for (let level = 1; level < dots; level++) dir = path.dirname(dir);
+      const wanted = posix(path.relative(root, path.join(dir, tail)));
+      const exact = context.python.find(({ file }) => moduleName(file) === wanted);
+      if (exact) return exact;
+    }
+    if (!tail) return undefined;
     return context.python.find(({ file }) => {
-      const name = posix(path.relative(root, file)).replace(/\.py$/, "").replace(/\/__init__$/, "");
+      const name = moduleName(file);
       return name === tail || name.endsWith(`/${tail}`);
     });
   };
+  const submodule = ({ module, name }) => (module.endsWith(".") ? `${module}${name}` : `${module}.${name}`);
+  /** Finds where a name lives: `from . import main` can mean a variable or a whole module. */
+  const locate = (entry, variable) => {
+    const imported = entry.imports[variable];
+    if (variable in entry.prefixes || !imported) return { home: entry, variable };
+    const places = [moduleFile(imported.module, entry.file), moduleFile(submodule(imported), entry.file)].filter(Boolean);
+    const home = places.find((place) => imported.name in place.prefixes) || places[0];
+    return home ? { home, variable: imported.name } : { home: entry, variable };
+  };
+
   const mounts = [];
-  for (const { text, imports } of context.python) {
-    const pattern = /\.(register_blueprint|include_router)\(\s*([\w.]+)/g;
-    for (let match; (match = pattern.exec(text)); ) {
-      const args = balanced(text, match.index + match[0].indexOf("("));
+  for (const entry of context.python) {
+    const pattern = /\b([A-Za-z_][\w.]*)\.(register_blueprint|include_router)\(\s*([\w.]+)/g;
+    for (let match; (match = pattern.exec(entry.text)); ) {
+      const args = balanced(entry.text, match.index + match[0].indexOf("("));
       const prefix = /\b(?:url_)?prefix\s*=\s*f?["']([^"']*)["']/.exec(args);
-      if (!prefix) continue;
-      const parts = match[2].split(".");
+      const parts = match[3].split(".");
       const variable = parts.pop();
-      const owner = parts.length ? imports[parts[0]] : imports[variable];
-      const module = owner ? (parts.length ? `${owner.module}.${owner.name}` : owner.module) : parts.join(".");
-      const target = module ? moduleFile(module) : null;
-      if (target) mounts.push({ file: target.file, variable: owner && !parts.length ? owner.name : variable, prefix: prefix[1] });
+      let target = locate(entry, variable);
+      if (parts.length) {
+        const owner = entry.imports[parts[0]];
+        const module = [owner ? submodule(owner) : parts[0], ...parts.slice(1)].join(".");
+        const home = moduleFile(module, entry.file);
+        if (!home) continue;
+        target = { home, variable };
+      }
+      mounts.push({
+        file: target.home.file,
+        variable: target.variable,
+        parent: locate(entry, match[1].split(".").pop()),
+        prefix: prefix ? prefix[1] : "",
+        // Flask replaces the prefix of the blueprint, FastAPI puts its own in front.
+        replaces: Boolean(prefix) && match[2] === "register_blueprint",
+      });
     }
   }
+  const fullPrefix = ({ home, variable }, depth = 0) => {
+    const own = home.prefixes[variable] || "";
+    const mount = depth < 8 && mounts.find((item) => item.file === home.file && item.variable === variable);
+    if (!mount) return own;
+    return joinPath(fullPrefix(mount.parent, depth + 1), mount.prefix, mount.replaces ? "" : own);
+  };
   for (const route of routes) {
     if (!route.receiver) continue;
     const entry = context.python.find(({ file }) => file === route.file);
     if (!entry) continue;
-    let home = entry;
-    let variable = route.receiver;
-    const imported = entry.imports[variable];
-    if (!(variable in entry.prefixes) && imported) {
-      home = moduleFile(imported.module) || entry;
-      variable = imported.name;
-    }
-    const own = home.prefixes[variable] || "";
-    const mount = mounts.find((item) => item.file === home.file && item.variable === variable);
-    route.path = normalize(joinPath(mount ? mount.prefix : "", own, route.path));
+    route.path = normalize(joinPath(fullPrefix(locate(entry, route.receiver)), route.path));
     delete route.receiver;
   }
 }
@@ -240,7 +269,7 @@ function scanDjango(file, text, context) {
   const pattern = /\b(?:re_)?path\(\s*r?["']([^"']*)["']\s*,\s*(include\(\s*(?:\(\s*)?["']([\w.]+)["'])?/g;
   for (let match; (match = pattern.exec(text)); ) {
     if (match[3]) {
-      context.djangoMounts.push({ module: match[3], prefix: match[1] });
+      context.djangoMounts.push({ file, module: match[3], prefix: match[1] });
       continue;
     }
     add(routes, { path: match[1] || "/", file, line: lineOf(text, match.index), source: "Django", admin: /admin\.site\.urls/.test(text.slice(match.index, match.index + 120)) });
@@ -256,7 +285,7 @@ function applyDjangoMounts(routes, context, root) {
       const tail = module.replace(/\./g, "/");
       return name === tail || name.endsWith(`/${tail}`);
     });
-    return mount ? mount.prefix : "";
+    return mount ? joinPath(prefixFor(mount.file, depth + 1), normalize(mount.prefix)) : "";
   };
   for (const route of routes) {
     if (route.source === "Django") route.path = normalize(joinPath(prefixFor(route.file), route.path));
@@ -273,9 +302,10 @@ function scanNode(file, text, context) {
   const guardedElsewhere = /\.(use|addHook)\(\s*(["'`][^"'`]*["'`]\s*,\s*)?\w*(auth|protect|require|admin|session|jwt)/i.test(text);
   const source = /\bfastify\b/i.test(text) ? "Fastify" : /\bhono\b/i.test(text) ? "Hono" : /\bkoa\b/i.test(text) ? "Koa" : "Express";
 
+  const declared = new Set([...text.matchAll(/\b([A-Za-z_$][\w$]*)\s*=\s*(?:new\s+)?(?:express\.)?(?:Router|Hono)\(/g)].map((match) => match[1]));
   const pattern = /\b([A-Za-z_$][\w$]*)\.(get|post|put|patch|delete|all|head|options)\(\s*[`'"]([^`'"]*)[`'"]\s*,/g;
   for (let match; (match = pattern.exec(text)); ) {
-    if (JS_CLIENT.test(match[1]) || !JS_RECEIVER.test(match[1])) continue;
+    if (JS_CLIENT.test(match[1]) || !(JS_RECEIVER.test(match[1]) || declared.has(match[1]))) continue;
     if (!match[3].startsWith("/") && match[3] !== "*") continue;
     const guards = text.slice(match.index, match.index + 200).split("\n")[0];
     add(routes, {
@@ -284,6 +314,7 @@ function scanNode(file, text, context) {
       file,
       line: lineOf(text, match.index),
       source,
+      receiver: match[1],
       protected: /\b(auth|requireAuth|isAuthenticated|protect|verifyToken|requireLogin)\w*/i.test(guards),
       admin: /\b\w*admin\w*\b/i.test(guards),
       guardedElsewhere,
@@ -293,32 +324,62 @@ function scanNode(file, text, context) {
   const chain = /\b([A-Za-z_$][\w$]*)\.route\(\s*[`'"](\/[^`'"]*)[`'"]\s*\)((?:\s*\.\w+\([^\n]*)+)/g;
   for (let match; (match = chain.exec(text)); ) {
     const methods = HTTP.filter((method) => new RegExp(`\\.${method}\\(`, "i").test(match[3]));
-    add(routes, { path: match[2], methods, file, line: lineOf(text, match.index), source });
+    add(routes, { path: match[2], methods, file, line: lineOf(text, match.index), source, receiver: match[1] });
   }
 
-  const imports = {};
-  const required = /(?:const|let|var)\s+(\w+)\s*=\s*require\(\s*["'](\.[^"']+)["']\s*\)|import\s+(\w+)\s+from\s+["'](\.[^"']+)["']/g;
-  for (let match; (match = required.exec(text)); ) imports[match[1] || match[3]] = match[2] || match[4];
-  const mount = /\.(?:use|route|register)\(\s*[`'"](\/[^`'"]*)[`'"]\s*,\s*(?:[\w.]+\s*,\s*)*(?:require\(\s*["'](\.[^"']+)["']\s*\)|(\w+))\s*\)/g;
-  for (let match; (match = mount.exec(text)); ) {
-    const target = match[2] || imports[match[3]];
-    if (target) context.nodeMounts.push({ from: file, target, prefix: match[1] });
-  }
+  const imports = nodeImports(text);
+  const mountOf = (receiver, prefix, module, variable) => {
+    const name = variable && variable.split(".")[0];
+    const target = module || imports[name];
+    if (target) context.nodeMounts.push({ from: file, receiver, target, prefix });
+    else if (name) context.nodeMounts.push({ from: file, receiver, variable: name, prefix });
+  };
+  const mount = /(?:\b([A-Za-z_$][\w$]*))?\.(?:use|route|register)\(\s*[`'"](\/[^`'"]*)[`'"]\s*,\s*(?:[\w.]+\s*,\s*)*(?:require\(\s*["'](\.[^"']+)["']\s*\)|([\w$.]+))\s*\)/g;
+  for (let match; (match = mount.exec(text)); ) mountOf(match[1], match[2], match[3], match[4]);
+  const plugin = /(?:\b([A-Za-z_$][\w$]*))?\.register\(\s*(?:require\(\s*["'](\.[^"']+)["']\s*\)|([\w$.]+))\s*,\s*\{[^}]*\bprefix:\s*[`'"]([^`'"]*)[`'"]/g;
+  for (let match; (match = plugin.exec(text)); ) mountOf(match[1], match[4], match[2], match[3]);
   return routes;
 }
 
+/** Local names of relative imports: default, named, namespace and require. */
+function nodeImports(text) {
+  const imports = {};
+  const names = (list, module, separator) => {
+    for (const piece of list.split(",")) {
+      const name = piece.trim().split(separator).pop().trim();
+      if (name) imports[name] = module;
+    }
+  };
+  const source = `["'](\\.[^"']+)["']`;
+  const direct = new RegExp(`(?:const|let|var)\\s+(\\w+)\\s*=\\s*require\\(\\s*${source}\\s*\\)|import\\s+(\\w+)\\s*(?:,\\s*\\{[^}]*\\}\\s*)?from\\s+${source}|import\\s+\\*\\s+as\\s+(\\w+)\\s+from\\s+${source}`, "g");
+  for (let match; (match = direct.exec(text)); ) imports[match[1] || match[3] || match[5]] = match[2] || match[4] || match[6];
+  const esm = new RegExp(`import\\s+(?:\\w+\\s*,\\s*)?\\{([^}]*)\\}\\s*from\\s+${source}`, "g");
+  for (let match; (match = esm.exec(text)); ) names(match[1], match[2], /\s+as\s+/);
+  const common = new RegExp(`(?:const|let|var)\\s*\\{([^}]*)\\}\\s*=\\s*require\\(\\s*${source}\\s*\\)`, "g");
+  for (let match; (match = common.exec(text)); ) names(match[1], match[2], ":");
+  return imports;
+}
+
 function applyNodeMounts(routes, context) {
-  const stem = (file) => posix(file).replace(/\.\w+$/, "").replace(/\/index$/, "");
+  const stem = (file) => posix(file).replace(/\.[cm]?[jt]sx?$/, "").replace(/\/index$/, "");
   const prefixes = new Map();
-  for (const { from, target, prefix } of context.nodeMounts) {
-    prefixes.set(stem(path.resolve(path.dirname(from), target)), { prefix, from });
+  const local = [];
+  for (const mount of context.nodeMounts) {
+    if (mount.target) prefixes.set(stem(path.resolve(path.dirname(mount.from), mount.target)), mount);
+    else local.push(mount);
   }
+  /** Routers mounted inside one file: api.use("/v1", v1), then app.use("/api", api). */
+  const within = (file, receiver, depth = 0) => {
+    const mount = depth < 5 && local.find((item) => item.from === file && item.variable === receiver);
+    return mount ? joinPath(within(file, mount.receiver, depth + 1), mount.prefix) : "";
+  };
   const chain = (file, depth = 0) => {
     const mount = prefixes.get(stem(file));
-    return mount && depth < 5 ? joinPath(chain(mount.from, depth + 1), mount.prefix) : "";
+    return mount && depth < 5 ? joinPath(chain(mount.from, depth + 1), within(mount.from, mount.receiver), mount.prefix) : "";
   };
   for (const route of routes) {
-    if (["Express", "Fastify", "Hono", "Koa"].includes(route.source)) route.path = normalize(joinPath(chain(route.file), route.path));
+    if (["Express", "Fastify", "Hono", "Koa"].includes(route.source)) route.path = normalize(joinPath(chain(route.file), within(route.file, route.receiver), route.path));
+    delete route.receiver;
   }
 }
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Follow more prefixes: routers mounted in the same file, named imports, files like `user.routes.js`, Fastify `register` options, nested `include_router` and Django `include`
+- Flask: a `url_prefix` at registration replaces the one of the blueprint
+- Python: imports over several lines and relative imports find the right module
+
 ## 0.2.1
 
 - Link the repository and show a screenshot in the README
