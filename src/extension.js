@@ -448,7 +448,7 @@ function activate(context) {
       const uri = await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(path.join(folders[0].uri.fsPath, "route-atlas-security.sarif")), filters: { "SARIF report": ["sarif", "json"] }, title: "Export Route Atlas security findings" });
       if (!uri) return;
       const report = toSarif(latestSecurityFindings, folders[0].uri.fsPath);
-      await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(report, null, 2) + "\\n", "utf8"));
+      await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(report, null, 2) + "\n", "utf8"));
       vscode.window.showInformationMessage("SARIF report exported. You can upload it to GitHub Code Scanning or another SARIF-compatible tool.");
     }),
     command("refresh", refresh),
