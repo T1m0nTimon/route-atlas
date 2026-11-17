@@ -37,7 +37,7 @@ Language recognition is extension/manifest based. Route extraction is framework-
 
 ### Security scan
 
-Run **Route Atlas: Run Security Scan** from the Command Palette. The scan is local, read-only and does not execute project code. It looks for indicators such as hard-coded credentials/private keys, SQL string-concatenation risks, dynamic evaluation, unsafe shell calls, unsafe HTML insertion, disabled TLS verification, wildcard CORS, weak hashes and debug flags. Findings include file, line, CWE reference, severity and confidence, and appear in the Problems panel and project dashboard.
+Open **Route Atlas → Security** in the left sidebar and click **Start security scan**. You can also use the scan button at the top of the Security view. The scan is local, read-only and does not execute project code. It looks for indicators such as hard-coded credentials/private keys, SQL string-concatenation risks, dynamic evaluation, unsafe shell calls, unsafe HTML insertion, disabled TLS verification, wildcard CORS, weak hashes and debug flags. Findings include file, line, CWE reference, severity and confidence, and appear in the Problems panel and project dashboard.
 
 These checks are heuristic. They can produce false positives and cannot prove that a project is secure. Use dedicated tools such as CodeQL, Semgrep, dependency audits and secret scanners for deeper coverage. Runtime tests and active security testing are not performed automatically.
 
