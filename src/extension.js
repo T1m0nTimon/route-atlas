@@ -85,6 +85,7 @@ function activate(context) {
   let again = false;
   let serial = 0;
   let latestSecurityFindings = [];
+  let lastRuntimeError = "";
 
   const showState = () => {
     const total = tree.results.reduce((sum, result) => sum + tree.visible(result.routes).length, 0);
@@ -155,6 +156,7 @@ function activate(context) {
     running = true;
     try {
       const exclude = config().get("exclude");
+      const runtimeErrors = [];
       tree.results = await Promise.all(
         (vscode.workspace.workspaceFolders || []).map(async (folder) => {
           const runtimeExecutable = config().get("laravelRuntimeExecutable", "php");
@@ -162,11 +164,18 @@ function activate(context) {
           const routes = await scan(folder.uri.fsPath, {
             exclude,
             laravelRuntime: vscode.workspace.isTrusted && config().get("laravelRuntime", false),
-            laravelRuntimeOptions: { executable: runtimeExecutable, args: runtimeArgs, requireArtisan: runtimeExecutable === "php" },
+            laravelRuntimeOptions: { executable: runtimeExecutable, args: runtimeArgs, requireArtisan: runtimeExecutable === "php", onError: (error) => runtimeErrors.push(error.message) },
           });
           return { folder, routes, ...(await locateServer(folder, routes)) };
         }),
       );
+      const runtimeError = [...new Set(runtimeErrors)].join("; ");
+      if (runtimeError && runtimeError !== lastRuntimeError) {
+        lastRuntimeError = runtimeError;
+        vscode.window.showWarningMessage(`Laravel runtime scan failed: ${runtimeError}. Static routes are still displayed.`);
+      } else if (!runtimeError) {
+        lastRuntimeError = "";
+      }
       // In a multi-root workspace the frontend may link to routes of another folder.
       const known = tree.results.flatMap((result) => result.routes);
       if (config().get("diagnostics") && config().get("brokenLinks")) {
@@ -359,7 +368,25 @@ function activate(context) {
     if (filled !== undefined) vscode.env.openExternal(vscode.Uri.parse(result.baseUrl + filled));
   };
 
+
   const allRoutes = () => tree.results.flatMap((result) => result.routes.map((route) => ({ route, result })));
+
+  const routeReport = () => tree.results.map((result) => {
+    const routes = result.routes.map((route) => {
+      const methods = route.methods && route.methods.length ? route.methods.join(", ") : "ANY";
+      const source = route.source || "Unknown";
+      const file = vscode.workspace.asRelativePath(route.file);
+      const extra = [
+        route.name ? `name=${route.name}` : "",
+        route.action ? `action=${route.action}` : "",
+        route.middleware && route.middleware.length ? `middleware=${route.middleware.join("|")}` : "",
+        route.runtime ? "runtime-registered" : "",
+      ].filter(Boolean).join("; ");
+      return `- ${methods} ${route.path} — ${source} — ${file}:${(route.line || 0) + 1}${extra ? ` — ${extra}` : ""}`;
+    });
+    return `## ${result.folder.name}\nDetected routes: ${result.routes.length}\n\n${routes.join("\n")}`;
+  }).join("\n\n");
+
 
   const watcher = vscode.workspace.createFileSystemWatcher("**/*.{py,js,jsx,mjs,cjs,ts,tsx,vue,svelte,astro,md,mdx,php,rb,java,kt,cs,go,rs,html,htm,swift,c,h,cc,cpp,cxx,hpp,m,mm,fs,fsx,vb,scala,groovy,dart,lua,pl,ex,exs,erl,hs,lhs,clj,cljs,r,jl,sql,sh,bash,zsh,ps1,css,scss,sass,less,json,jsonc,yaml,yml,toml,xml,graphql,gql,proto,tf,hcl,ipynb}");
   const command = (name, handler) => vscode.commands.registerCommand(`routeAtlas.${name}`, handler);
@@ -547,6 +574,76 @@ function activate(context) {
     command("unfavorite", (node) => {
       const { route, result } = target(node);
       tree.toggleFavorite(result, route);
+    }),
+    command("copyAllRoutes", async () => {
+      if (!tree.results.length) { vscode.window.showWarningMessage("Route Atlas has not found a project yet."); return; }
+      const report = `# Route Atlas — complete route export\n\n${routeReport()}\n`;
+      await vscode.env.clipboard.writeText(report);
+      vscode.window.showInformationMessage(`Copied ${allRoutes().length} detected routes from ${tree.results.length} project(s).`);
+    }),
+    command("generateAiPrompt", async () => {
+      if (!tree.results.length) { vscode.window.showWarningMessage("Route Atlas has not found a project yet."); return; }
+      const report = routeReport();
+      const prompt = [
+        "You are an experienced software architect and route-analysis specialist.",
+        "Analyze the route inventory below against the project/framework context I provide.",
+        "Identify likely missing routes, duplicate/conflicting routes, incorrect HTTP methods, suspicious access-control gaps and routes that may be registered dynamically by plugins or service providers.",
+        "Do not invent routes. Clearly separate confirmed findings from hypotheses, explain what source files or runtime commands are needed to verify gaps, and propose concrete safe next steps.",
+        "The inventory may be incomplete if framework routes are registered at runtime. For Laravel, compare it with `php artisan route:list --json` from the actual application/container.",
+        "",
+        "## Project context",
+        ...tree.results.map((result) => `- Project: ${result.folder.name}; detected routes: ${result.routes.length}; runtime-derived routes: ${result.routes.filter((route) => route.runtime).length}`),
+        "",
+        "## Complete detected route inventory",
+        report,
+        "",
+        "Please analyze this data and tell me how to discover and add routes that are still missing. Do not claim the scan is complete unless the evidence supports that."
+      ].join("\n");
+      await vscode.env.clipboard.writeText(prompt);
+      vscode.window.showInformationMessage("AI prompt and complete route inventory copied. Paste it into ChatGPT, Claude or another AI.");
+    }),
+    command("configureLaravelRuntime", async () => {
+      if (!vscode.workspace.isTrusted) {
+        vscode.window.showWarningMessage("Trust this workspace before enabling Laravel runtime scanning. It boots the application and may execute service providers.");
+        return;
+      }
+      const folders = vscode.workspace.workspaceFolders || [];
+      if (!folders.length) return;
+      const mode = await vscode.window.showQuickPick([
+        { label: "Docker container", description: "Run Artisan inside a running container", value: "docker" },
+        { label: "Local PHP", description: "Run Artisan on this computer", value: "php" }
+      ], { title: "How should Route Atlas load Laravel routes?" });
+      if (!mode) return;
+      let executable = mode.value;
+      let args = ["artisan", "route:list", "--json"];
+      if (mode.value === "docker") {
+        const container = await vscode.window.showInputBox({
+          title: "Docker container name",
+          value: "nova-pelican-panel",
+          prompt: "Name of the running Laravel container"
+        });
+        if (!container) return;
+        const workingDir = await vscode.window.showInputBox({
+          title: "Laravel project path inside the container",
+          value: "/var/www/html",
+          prompt: "Directory containing the artisan file"
+        });
+        if (!workingDir) return;
+        executable = "docker";
+        args = ["exec", "-w", workingDir.trim(), container.trim(), "php", "artisan", "route:list", "--json"];
+      }
+      const targetScope = vscode.ConfigurationTarget.Workspace;
+      await config().update("laravelRuntimeExecutable", executable, targetScope);
+      await config().update("laravelRuntimeArgs", args, targetScope);
+      await config().update("laravelRuntime", true, targetScope);
+      vscode.window.showInformationMessage("Laravel runtime scanning enabled. Route Atlas will now refresh using the live Laravel route registry.");
+      await refresh();
+      const runtimeCount = tree.results.reduce((sum, result) => sum + result.routes.filter((route) => route.runtime).length, 0);
+      if (runtimeCount) {
+        vscode.window.showInformationMessage(`Laravel runtime scan successful: ${runtimeCount} runtime route entries are now included.`);
+      } else {
+        vscode.window.showWarningMessage("No runtime routes were loaded. Check that Docker/PHP is running, the container name and path are correct, and the container has a working Laravel installation. The static results are still shown.");
+      }
     }),
     command("copyAs", copyAs),
     command("generateHelpers", generateHelpers),
