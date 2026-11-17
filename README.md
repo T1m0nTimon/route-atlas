@@ -41,7 +41,7 @@ Run **Route Atlas: Run Security Scan** from the Command Palette. The scan is loc
 
 These checks are heuristic. They can produce false positives and cannot prove that a project is secure. Use dedicated tools such as CodeQL, Semgrep, dependency audits and secret scanners for deeper coverage. Runtime tests and active security testing are not performed automatically.
 
-Run **Route Atlas: Open Project Dashboard** for a visual summary of routes, detected languages and security indicators.
+Run **Route Atlas: Open Project Dashboard** for a visual summary of routes, detected languages and security indicators. After scanning, use **Route Atlas: Export Security Findings as SARIF** to create a SARIF 2.1.0 report for GitHub Code Scanning and compatible security platforms.
 
 ## Supported
 
