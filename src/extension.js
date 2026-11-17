@@ -73,6 +73,7 @@ function activate(context) {
     showCollapseAll: false,
   });
   const problems = vscode.languages.createDiagnosticCollection("Route Atlas");
+  const securityProblems = vscode.languages.createDiagnosticCollection("Route Atlas Security");
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 20);
   const lensChanged = new vscode.EventEmitter();
   const documents = new Map();
@@ -368,6 +369,7 @@ function activate(context) {
     securityEmitter,
     watcher,
     problems,
+    securityProblems,
     statusBar,
     watcher.onDidCreate(schedule),
     watcher.onDidChange(schedule),
@@ -455,7 +457,8 @@ function activate(context) {
         return item;
       }));
       securityEmitter.fire();
-      const diagnostics = vscode.languages.createDiagnosticCollection("Route Atlas Security"); const grouped = new Map();
+      securityProblems.clear();
+      const grouped = new Map();
       const severity = { critical: vscode.DiagnosticSeverity.Error, high: vscode.DiagnosticSeverity.Error, medium: vscode.DiagnosticSeverity.Warning, low: vscode.DiagnosticSeverity.Information };
       for (const finding of findings) {
         const uri = vscode.Uri.file(finding.file); const list = grouped.get(uri.toString()) || [];
@@ -463,7 +466,7 @@ function activate(context) {
         const diagnostic = new vscode.Diagnostic(new vscode.Range(line, column, line, column + 1), finding.title + " (" + finding.cwe + "; " + finding.confidence + " confidence). Review manually; static detection can produce false positives.", severity[finding.severity] || vscode.DiagnosticSeverity.Warning);
         diagnostic.source = "Route Atlas Security"; diagnostic.code = finding.id; list.push(diagnostic); grouped.set(uri.toString(), list);
       }
-      for (const [uri, list] of grouped) diagnostics.set(vscode.Uri.parse(uri), list); context.subscriptions.push(diagnostics);
+      for (const [uri, list] of grouped) securityProblems.set(vscode.Uri.parse(uri), list);
       const languages = [...languageStats].map(([language, files]) => ({ language, files })).sort((a,b) => b.files-a.files);
       const panel = vscode.window.createWebviewPanel("routeAtlas.dashboard", "Route Atlas — Security & Project", vscode.ViewColumn.Beside, { enableScripts: false });
       panel.webview.html = dashboardHtml({ title: folders.map((folder) => folder.name).join(", "), routes: Array(routeCount), languages, findings });
