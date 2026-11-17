@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1
+
+- Add a dedicated Security view in the Route Atlas sidebar.
+- Add a clear one-click **Start security scan** action and visible findings list.
+- Click a finding to jump directly to the affected file and line.
+
 ## 0.4.0
 
 - Add broad language and project-manifest recognition.
