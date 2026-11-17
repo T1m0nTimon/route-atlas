@@ -2,21 +2,52 @@
   "name": "route-atlas",
   "displayName": "Route Atlas",
   "description": "See every page and endpoint of a web project in one sorted tree, jump to the code, send requests, find broken links and generate typed route helpers. Works with Flask, Next.js, Express, Django, Laravel and many more.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "t1m0ntimon",
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/T1m0nTimon/route-atlas.git" },
-  "bugs": { "url": "https://github.com/T1m0nTimon/route-atlas/issues" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/T1m0nTimon/route-atlas.git"
+  },
+  "bugs": {
+    "url": "https://github.com/T1m0nTimon/route-atlas/issues"
+  },
   "homepage": "https://github.com/T1m0nTimon/route-atlas#readme",
   "icon": "media/icon.png",
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Programming Languages", "Testing", "Linters", "Other"],
-  "keywords": ["routes", "endpoints", "sitemap", "api", "openapi", "broken links", "curl", "typescript", "cli", "flask", "nextjs", "express", "django", "laravel"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Testing",
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "routes",
+    "endpoints",
+    "sitemap",
+    "api",
+    "openapi",
+    "broken links",
+    "curl",
+    "typescript",
+    "cli",
+    "flask",
+    "nextjs",
+    "express",
+    "django",
+    "laravel"
+  ],
   "main": "./src/extension.js",
-  "bin": { "route-atlas": "bin/route-atlas.js" },
-  "activationEvents": ["onStartupFinished"],
+  "bin": {
+    "route-atlas": "bin/route-atlas.js"
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "scripts": {
-    "test": "node --test test/scanner.test.js test/features.test.js test/links.test.js test/tools.test.js test/cli.test.js",
+    "test": "node --test test/scanner.test.js test/features.test.js test/links.test.js test/tools.test.js test/cli.test.js test/laravel-runtime.test.js",
     "package": "npx --yes @vscode/vsce package --no-dependencies"
   },
   "capabilities": {
@@ -24,15 +55,34 @@
     "untrustedWorkspaces": {
       "supported": "limited",
       "description": "Addresses, headers, custom patterns and the route helpers file from an untrusted workspace are ignored.",
-      "restrictedConfigurations": ["routeAtlas.baseUrl", "routeAtlas.requestHeaders", "routeAtlas.categories", "routeAtlas.ignoreLinks", "routeAtlas.helpersFile"]
+      "restrictedConfigurations": [
+        "routeAtlas.baseUrl",
+        "routeAtlas.requestHeaders",
+        "routeAtlas.categories",
+        "routeAtlas.ignoreLinks",
+        "routeAtlas.helpersFile",
+        "routeAtlas.laravelRuntime"
+      ]
     }
   },
   "contributes": {
     "viewsContainers": {
-      "activitybar": [{ "id": "routeAtlas", "title": "Route Atlas", "icon": "media/activity.svg" }]
+      "activitybar": [
+        {
+          "id": "routeAtlas",
+          "title": "Route Atlas",
+          "icon": "media/activity.svg"
+        }
+      ]
     },
     "views": {
-      "routeAtlas": [{ "id": "routeAtlas.routes", "name": "Routes", "icon": "media/activity.svg" }]
+      "routeAtlas": [
+        {
+          "id": "routeAtlas.routes",
+          "name": "Routes",
+          "icon": "media/activity.svg"
+        }
+      ]
     },
     "viewsWelcome": [
       {
@@ -47,59 +97,240 @@
       }
     ],
     "commands": [
-      { "command": "routeAtlas.search", "title": "Find a Route", "category": "Route Atlas", "icon": "$(search)" },
-      { "command": "routeAtlas.groupBy", "title": "Group Routes By...", "category": "Route Atlas", "icon": "$(list-tree)" },
-      { "command": "routeAtlas.checkAll", "title": "Check All Routes", "category": "Route Atlas", "icon": "$(pulse)" },
-      { "command": "routeAtlas.export", "title": "Export Routes...", "category": "Route Atlas", "icon": "$(export)" },
-      { "command": "routeAtlas.setServer", "title": "Set Server Address", "category": "Route Atlas", "icon": "$(server)" },
-      { "command": "routeAtlas.refresh", "title": "Search Again", "category": "Route Atlas", "icon": "$(refresh)" },
-      { "command": "routeAtlas.filter", "title": "Filter Routes", "category": "Route Atlas", "icon": "$(filter)" },
-      { "command": "routeAtlas.clearFilter", "title": "Clear Filter", "category": "Route Atlas", "icon": "$(filter-filled)" },
-      { "command": "routeAtlas.open", "title": "Open File", "category": "Route Atlas" },
-      { "command": "routeAtlas.browser", "title": "Open in Browser", "category": "Route Atlas", "icon": "$(globe)" },
-      { "command": "routeAtlas.send", "title": "Send Request", "category": "Route Atlas", "icon": "$(play)" },
-      { "command": "routeAtlas.favorite", "title": "Add to Favorites", "category": "Route Atlas", "icon": "$(star-empty)" },
-      { "command": "routeAtlas.unfavorite", "title": "Remove from Favorites", "category": "Route Atlas", "icon": "$(star-full)" },
-      { "command": "routeAtlas.copyPath", "title": "Copy Path", "category": "Route Atlas" },
-      { "command": "routeAtlas.copyUrl", "title": "Copy Address", "category": "Route Atlas" },
-      { "command": "routeAtlas.copyAs", "title": "Copy as cURL, fetch, Axios...", "category": "Route Atlas" },
-      { "command": "routeAtlas.generateHelpers", "title": "Generate TypeScript Route Helpers", "category": "Route Atlas", "icon": "$(symbol-namespace)" }
+      {
+        "command": "routeAtlas.search",
+        "title": "Find a Route",
+        "category": "Route Atlas",
+        "icon": "$(search)"
+      },
+      {
+        "command": "routeAtlas.groupBy",
+        "title": "Group Routes By...",
+        "category": "Route Atlas",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "routeAtlas.checkAll",
+        "title": "Check All Routes",
+        "category": "Route Atlas",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "routeAtlas.export",
+        "title": "Export Routes...",
+        "category": "Route Atlas",
+        "icon": "$(export)"
+      },
+      {
+        "command": "routeAtlas.setServer",
+        "title": "Set Server Address",
+        "category": "Route Atlas",
+        "icon": "$(server)"
+      },
+      {
+        "command": "routeAtlas.refresh",
+        "title": "Search Again",
+        "category": "Route Atlas",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "routeAtlas.filter",
+        "title": "Filter Routes",
+        "category": "Route Atlas",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "routeAtlas.clearFilter",
+        "title": "Clear Filter",
+        "category": "Route Atlas",
+        "icon": "$(filter-filled)"
+      },
+      {
+        "command": "routeAtlas.open",
+        "title": "Open File",
+        "category": "Route Atlas"
+      },
+      {
+        "command": "routeAtlas.browser",
+        "title": "Open in Browser",
+        "category": "Route Atlas",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "routeAtlas.send",
+        "title": "Send Request",
+        "category": "Route Atlas",
+        "icon": "$(play)"
+      },
+      {
+        "command": "routeAtlas.favorite",
+        "title": "Add to Favorites",
+        "category": "Route Atlas",
+        "icon": "$(star-empty)"
+      },
+      {
+        "command": "routeAtlas.unfavorite",
+        "title": "Remove from Favorites",
+        "category": "Route Atlas",
+        "icon": "$(star-full)"
+      },
+      {
+        "command": "routeAtlas.copyPath",
+        "title": "Copy Path",
+        "category": "Route Atlas"
+      },
+      {
+        "command": "routeAtlas.copyUrl",
+        "title": "Copy Address",
+        "category": "Route Atlas"
+      },
+      {
+        "command": "routeAtlas.copyAs",
+        "title": "Copy as cURL, fetch, Axios...",
+        "category": "Route Atlas"
+      },
+      {
+        "command": "routeAtlas.generateHelpers",
+        "title": "Generate TypeScript Route Helpers",
+        "category": "Route Atlas",
+        "icon": "$(symbol-namespace)"
+      }
     ],
     "keybindings": [
-      { "command": "routeAtlas.search", "key": "ctrl+alt+r", "mac": "cmd+alt+r" }
+      {
+        "command": "routeAtlas.search",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r"
+      }
     ],
     "menus": {
       "view/title": [
-        { "command": "routeAtlas.search", "when": "view == routeAtlas.routes", "group": "navigation@1" },
-        { "command": "routeAtlas.filter", "when": "view == routeAtlas.routes && !routeAtlas.filtered", "group": "navigation@2" },
-        { "command": "routeAtlas.clearFilter", "when": "view == routeAtlas.routes && routeAtlas.filtered", "group": "navigation@2" },
-        { "command": "routeAtlas.groupBy", "when": "view == routeAtlas.routes", "group": "navigation@3" },
-        { "command": "routeAtlas.checkAll", "when": "view == routeAtlas.routes", "group": "navigation@4" },
-        { "command": "routeAtlas.export", "when": "view == routeAtlas.routes", "group": "1_tools@1" },
-        { "command": "routeAtlas.setServer", "when": "view == routeAtlas.routes", "group": "1_tools@2" },
-        { "command": "routeAtlas.generateHelpers", "when": "view == routeAtlas.routes", "group": "1_tools@2" },
-        { "command": "routeAtlas.refresh", "when": "view == routeAtlas.routes", "group": "1_tools@3" }
+        {
+          "command": "routeAtlas.search",
+          "when": "view == routeAtlas.routes",
+          "group": "navigation@1"
+        },
+        {
+          "command": "routeAtlas.filter",
+          "when": "view == routeAtlas.routes && !routeAtlas.filtered",
+          "group": "navigation@2"
+        },
+        {
+          "command": "routeAtlas.clearFilter",
+          "when": "view == routeAtlas.routes && routeAtlas.filtered",
+          "group": "navigation@2"
+        },
+        {
+          "command": "routeAtlas.groupBy",
+          "when": "view == routeAtlas.routes",
+          "group": "navigation@3"
+        },
+        {
+          "command": "routeAtlas.checkAll",
+          "when": "view == routeAtlas.routes",
+          "group": "navigation@4"
+        },
+        {
+          "command": "routeAtlas.export",
+          "when": "view == routeAtlas.routes",
+          "group": "1_tools@1"
+        },
+        {
+          "command": "routeAtlas.setServer",
+          "when": "view == routeAtlas.routes",
+          "group": "1_tools@2"
+        },
+        {
+          "command": "routeAtlas.generateHelpers",
+          "when": "view == routeAtlas.routes",
+          "group": "1_tools@2"
+        },
+        {
+          "command": "routeAtlas.refresh",
+          "when": "view == routeAtlas.routes",
+          "group": "1_tools@3"
+        }
       ],
       "view/item/context": [
-        { "command": "routeAtlas.send", "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/", "group": "inline@1" },
-        { "command": "routeAtlas.browser", "when": "view == routeAtlas.routes && viewItem =~ /^route/", "group": "inline@2" },
-        { "command": "routeAtlas.send", "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/", "group": "1_open@1" },
-        { "command": "routeAtlas.browser", "when": "view == routeAtlas.routes && viewItem =~ /^route/", "group": "1_open@2" },
-        { "command": "routeAtlas.favorite", "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)$/", "group": "2_favorite" },
-        { "command": "routeAtlas.unfavorite", "when": "view == routeAtlas.routes && viewItem =~ /\\.favorite$/", "group": "2_favorite" },
-        { "command": "routeAtlas.copyPath", "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/", "group": "3_copy@1" },
-        { "command": "routeAtlas.copyUrl", "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/", "group": "3_copy@2" },
-        { "command": "routeAtlas.copyAs", "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/", "group": "3_copy@3" }
+        {
+          "command": "routeAtlas.send",
+          "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/",
+          "group": "inline@1"
+        },
+        {
+          "command": "routeAtlas.browser",
+          "when": "view == routeAtlas.routes && viewItem =~ /^route/",
+          "group": "inline@2"
+        },
+        {
+          "command": "routeAtlas.send",
+          "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/",
+          "group": "1_open@1"
+        },
+        {
+          "command": "routeAtlas.browser",
+          "when": "view == routeAtlas.routes && viewItem =~ /^route/",
+          "group": "1_open@2"
+        },
+        {
+          "command": "routeAtlas.favorite",
+          "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)$/",
+          "group": "2_favorite"
+        },
+        {
+          "command": "routeAtlas.unfavorite",
+          "when": "view == routeAtlas.routes && viewItem =~ /\\.favorite$/",
+          "group": "2_favorite"
+        },
+        {
+          "command": "routeAtlas.copyPath",
+          "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/",
+          "group": "3_copy@1"
+        },
+        {
+          "command": "routeAtlas.copyUrl",
+          "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/",
+          "group": "3_copy@2"
+        },
+        {
+          "command": "routeAtlas.copyAs",
+          "when": "view == routeAtlas.routes && viewItem =~ /^(route|endpoint)/",
+          "group": "3_copy@3"
+        }
       ],
       "commandPalette": [
-        { "command": "routeAtlas.open", "when": "false" },
-        { "command": "routeAtlas.browser", "when": "false" },
-        { "command": "routeAtlas.send", "when": "false" },
-        { "command": "routeAtlas.favorite", "when": "false" },
-        { "command": "routeAtlas.unfavorite", "when": "false" },
-        { "command": "routeAtlas.copyPath", "when": "false" },
-        { "command": "routeAtlas.copyUrl", "when": "false" },
-        { "command": "routeAtlas.copyAs", "when": "false" }
+        {
+          "command": "routeAtlas.open",
+          "when": "false"
+        },
+        {
+          "command": "routeAtlas.browser",
+          "when": "false"
+        },
+        {
+          "command": "routeAtlas.send",
+          "when": "false"
+        },
+        {
+          "command": "routeAtlas.favorite",
+          "when": "false"
+        },
+        {
+          "command": "routeAtlas.unfavorite",
+          "when": "false"
+        },
+        {
+          "command": "routeAtlas.copyPath",
+          "when": "false"
+        },
+        {
+          "command": "routeAtlas.copyUrl",
+          "when": "false"
+        },
+        {
+          "command": "routeAtlas.copyAs",
+          "when": "false"
+        }
       ]
     },
     "configuration": {
@@ -113,7 +344,9 @@
         "routeAtlas.requestHeaders": {
           "type": "object",
           "default": {},
-          "additionalProperties": { "type": "string" },
+          "additionalProperties": {
+            "type": "string"
+          },
           "markdownDescription": "Headers sent with every request, for example `{ \"Authorization\": \"Bearer ...\" }`. Keep tokens in your user settings, not in a committed workspace file."
         },
         "routeAtlas.categories": {
@@ -122,17 +355,30 @@
           "markdownDescription": "Your own categories, they win over the built-in ones. Example: `{ \"label\": \"Shop\", \"pattern\": \"^/(shop|cart)\", \"icon\": \"tag\" }`",
           "items": {
             "type": "object",
-            "required": ["label", "pattern"],
+            "required": [
+              "label",
+              "pattern"
+            ],
             "properties": {
-              "label": { "type": "string" },
-              "pattern": { "type": "string", "description": "Regular expression for the path" },
-              "icon": { "type": "string", "description": "Name of a codicon" }
+              "label": {
+                "type": "string"
+              },
+              "pattern": {
+                "type": "string",
+                "description": "Regular expression for the path"
+              },
+              "icon": {
+                "type": "string",
+                "description": "Name of a codicon"
+              }
             }
           }
         },
         "routeAtlas.exclude": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "More folder names to skip."
         },
@@ -153,7 +399,9 @@
         },
         "routeAtlas.ignoreLinks": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "markdownDescription": "Regular expressions for paths that are never reported as broken, for example `^/api/` when the API runs in another project."
         },
@@ -164,9 +412,18 @@
         },
         "routeAtlas.language": {
           "type": "string",
-          "enum": ["auto", "en", "de"],
+          "enum": [
+            "auto",
+            "en",
+            "de"
+          ],
           "default": "auto",
           "description": "Language of the view. Auto follows the editor and the system."
+        },
+        "routeAtlas.laravelRuntime": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Run `php artisan route:list --json` to include dynamically registered Laravel routes. This boots the project and may execute service providers or connect to configured services. Enable only for a trusted project."
         }
       }
     }
