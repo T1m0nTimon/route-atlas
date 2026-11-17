@@ -140,7 +140,7 @@ function activate(context) {
       const exclude = config().get("exclude");
       tree.results = await Promise.all(
         (vscode.workspace.workspaceFolders || []).map(async (folder) => {
-          const routes = await scan(folder.uri.fsPath, { exclude });
+          const routes = await scan(folder.uri.fsPath, { exclude, laravelRuntime: vscode.workspace.isTrusted && config().get("laravelRuntime", false) });
           return { folder, routes, ...(await locateServer(folder, routes)) };
         }),
       );
