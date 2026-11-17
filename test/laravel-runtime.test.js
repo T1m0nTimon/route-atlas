@@ -12,7 +12,7 @@ test("parses Laravel route:list JSON including methods, middleware and API route
   ]), "/project");
 
   assert.equal(routes.length, 2);
-  assert.equal(routes[0].path, "/admin/users/{user}");
+  assert.equal(routes[0].path, "/admin/users/:user");
   assert.deepEqual(routes[0].methods, ["GET", "HEAD"]);
   assert.equal(routes[0].protected, true);
   assert.equal(routes[0].source, "Laravel");
