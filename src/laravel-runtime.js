@@ -27,8 +27,14 @@ function parseLaravelRoutes(output, root) {
         ? item.middleware
         : String(item.middleware || "").split(",").map((value) => value.trim()).filter(Boolean);
       const uri = item.uri.startsWith("/") ? item.uri.slice(1) : item.uri;
+      const normalizedUri = uri.split("/").map((segment) => {
+        if (!segment.startsWith("{") || !segment.endsWith("}")) return segment;
+        let parameter = segment.slice(1, -1);
+        if (parameter.endsWith("?")) parameter = parameter.slice(0, -1);
+        return `:${parameter.split(":")[0]}`;
+      }).join("/");
       return {
-        path: `/${uri.replace(/\\{(\\w+)(?::[^}]+)?\\??\\}/g, ":$1")}`,
+        path: `/${normalizedUri}`,
         methods: [...new Set(methods)],
         kind: (uri === "api" || uri.startsWith("api/")) ? "api" : "page",
         file: routeFile,
