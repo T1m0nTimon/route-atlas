@@ -63,7 +63,8 @@ function parse(argv) {
         break;
       case "--laravel-runtime":
         options.laravelRuntime = true;
-        break;\n      case "--exclude":
+        break;
+      case "--exclude":
         options.exclude.push(...next().split(",").map((item) => item.trim()).filter(Boolean));
         break;
       case "--ignore-link":
