@@ -347,7 +347,7 @@ function activate(context) {
 
   const allRoutes = () => tree.results.flatMap((result) => result.routes.map((route) => ({ route, result })));
 
-  const watcher = vscode.workspace.createFileSystemWatcher("**/*.{py,js,jsx,mjs,cjs,ts,tsx,vue,svelte,astro,md,mdx,php,rb,java,kt,cs,go,rs,html,htm}");
+  const watcher = vscode.workspace.createFileSystemWatcher("**/*.{py,js,jsx,mjs,cjs,ts,tsx,vue,svelte,astro,md,mdx,php,rb,java,kt,cs,go,rs,html,htm,swift,c,h,cc,cpp,cxx,hpp,m,mm,fs,fsx,vb,scala,groovy,dart,lua,pl,ex,exs,erl,hs,lhs,clj,cljs,r,jl,sql,sh,bash,zsh,ps1,css,scss,sass,less,json,jsonc,yaml,yml,toml,xml,graphql,gql,proto,tf,hcl,ipynb}");
   const command = (name, handler) => vscode.commands.registerCommand(`routeAtlas.${name}`, handler);
   context.subscriptions.push(
     view,
