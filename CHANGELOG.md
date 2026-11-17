@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1
+
+- Optional Laravel runtime scanning via `php artisan route:list --json`, so routes registered by service providers and plugins can be discovered
+- Runtime scanning is opt-in, uses a shell-free process with a timeout, and falls back to static scanning if PHP or Artisan is unavailable
+- CLI option: `--laravel-runtime`; VS Code setting: `routeAtlas.laravelRuntime`
+- Added parser tests for Laravel route-list output
+
 ## 0.3.0
 
 Tools for full-stack developers: Route Atlas now checks your links, writes request code for you and keeps your frontend in step with your routes.
