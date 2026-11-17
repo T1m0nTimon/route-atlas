@@ -14,7 +14,7 @@ const TEST_DIRS = new Set(["test", "tests", "__tests__", "__mocks__", "spec", "s
 const TEST_FILE = /(^test_.*|^conftest\.py$|_test\.\w+$|[.-](test|spec|stories)\.\w+$)/;
 const CODE_EXT = new Set([
   ".py", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".vue", ".svelte", ".astro", ".md", ".mdx",
-  ".php", ".rb", ".java", ".kt", ".cs", ".go", ".rs", ".html", ".htm",
+  ".php", ".rb", ".java", ".kt", ".cs", ".go", ".rs", ".html", ".htm", ".swift", ".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".m", ".mm", ".fs", ".fsx", ".vb", ".scala", ".groovy", ".dart", ".lua", ".pl", ".ex", ".exs", ".erl", ".hs", ".lhs", ".clj", ".cljs", ".r", ".jl", ".sql", ".sh", ".bash", ".zsh", ".ps1", ".css", ".scss", ".sass", ".less", ".json", ".jsonc", ".yaml", ".yml", ".toml", ".xml", ".graphql", ".gql", ".proto", ".tf", ".hcl", ".ipynb",
 ]);
 const MAX_FILE_SIZE = 1024 * 1024;
 const JS_EXT = new Set([".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".vue"]);
