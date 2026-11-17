@@ -85,6 +85,7 @@ function activate(context) {
   let again = false;
   let serial = 0;
   let latestSecurityFindings = [];
+  let lastRuntimeError = "";
 
   const showState = () => {
     const total = tree.results.reduce((sum, result) => sum + tree.visible(result.routes).length, 0);
@@ -155,6 +156,7 @@ function activate(context) {
     running = true;
     try {
       const exclude = config().get("exclude");
+      const runtimeErrors = [];
       tree.results = await Promise.all(
         (vscode.workspace.workspaceFolders || []).map(async (folder) => {
           const runtimeExecutable = config().get("laravelRuntimeExecutable", "php");
@@ -162,11 +164,18 @@ function activate(context) {
           const routes = await scan(folder.uri.fsPath, {
             exclude,
             laravelRuntime: vscode.workspace.isTrusted && config().get("laravelRuntime", false),
-            laravelRuntimeOptions: { executable: runtimeExecutable, args: runtimeArgs, requireArtisan: runtimeExecutable === "php" },
+            laravelRuntimeOptions: { executable: runtimeExecutable, args: runtimeArgs, requireArtisan: runtimeExecutable === "php", onError: (error) => runtimeErrors.push(error.message) },
           });
           return { folder, routes, ...(await locateServer(folder, routes)) };
         }),
       );
+      const runtimeError = [...new Set(runtimeErrors)].join("; ");
+      if (runtimeError && runtimeError !== lastRuntimeError) {
+        lastRuntimeError = runtimeError;
+        vscode.window.showWarningMessage(`Laravel runtime scan failed: ${runtimeError}. Static routes are still displayed.`);
+      } else if (!runtimeError) {
+        lastRuntimeError = "";
+      }
       // In a multi-root workspace the frontend may link to routes of another folder.
       const known = tree.results.flatMap((result) => result.routes);
       if (config().get("diagnostics") && config().get("brokenLinks")) {
