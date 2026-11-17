@@ -47,7 +47,7 @@
     "onStartupFinished"
   ],
   "scripts": {
-    "test": "node --test test/scanner.test.js test/features.test.js test/links.test.js test/tools.test.js test/cli.test.js test/laravel-runtime.test.js test/universal-security.test.js",
+    "test": "node --test test/scanner.test.js test/features.test.js test/links.test.js test/tools.test.js test/cli.test.js test/laravel-runtime.test.js test/universal-security.test.js test/sarif.test.js",
     "package": "npx --yes @vscode/vsce package --no-dependencies"
   },
   "capabilities": {
@@ -208,6 +208,12 @@
         "title": "Open Project Dashboard",
         "category": "Route Atlas",
         "icon": "$(dashboard)"
+      },
+      {
+        "command": "routeAtlas.exportSecuritySarif",
+        "title": "Export Security Findings as SARIF",
+        "category": "Route Atlas",
+        "icon": "$(export)"
       }
     ],
     "keybindings": [
