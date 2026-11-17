@@ -61,6 +61,17 @@ function activate(context) {
   const t = createTranslator(resolveLanguage(config().get("language"), vscode.env.language, systemLocale()));
   const tree = new RouteTree({ state: context.workspaceState, t });
   const view = vscode.window.createTreeView("routeAtlas.routes", { treeDataProvider: tree, showCollapseAll: true });
+  const securityItems = [];
+  const securityEmitter = new vscode.EventEmitter();
+  const securityProvider = {
+    onDidChangeTreeData: securityEmitter.event,
+    getTreeItem: (item) => item,
+    getChildren: () => securityItems,
+  };
+  const securityView = vscode.window.createTreeView("routeAtlas.security", {
+    treeDataProvider: securityProvider,
+    showCollapseAll: false,
+  });
   const problems = vscode.languages.createDiagnosticCollection("Route Atlas");
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 20);
   const lensChanged = new vscode.EventEmitter();
@@ -353,6 +364,8 @@ function activate(context) {
   const command = (name, handler) => vscode.commands.registerCommand(`routeAtlas.${name}`, handler);
   context.subscriptions.push(
     view,
+    securityView,
+    securityEmitter,
     watcher,
     problems,
     statusBar,
@@ -411,6 +424,14 @@ function activate(context) {
         return found ? new vscode.Location(vscode.Uri.file(found.file), new vscode.Position(found.line, 0)) : undefined;
       },
     }),
+    command("openSecurityFinding", async (finding) => {
+      if (!finding || !finding.file) return;
+      const document = await vscode.workspace.openTextDocument(vscode.Uri.file(finding.file));
+      const editor = await vscode.window.showTextDocument(document, { preview: false });
+      const position = new vscode.Position(Math.max(0, (finding.line || 1) - 1), Math.max(0, finding.column || 0));
+      editor.selection = new vscode.Selection(position, position);
+      editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+    }),
     command("securityScan", async () => {
       if (!vscode.workspace.isTrusted) { vscode.window.showWarningMessage("Security scanning is disabled in Restricted Mode. Trust this workspace to scan its files."); return; }
       const folders = vscode.workspace.workspaceFolders || []; if (!folders.length) return;
@@ -424,6 +445,16 @@ function activate(context) {
         }
       });
       latestSecurityFindings = findings;
+      securityItems.splice(0, securityItems.length, ...findings.map((finding) => {
+        const relative = vscode.workspace.asRelativePath(finding.file);
+        const item = new vscode.TreeItem(`[${finding.severity.toUpperCase()}] ${finding.title}`, vscode.TreeItemCollapsibleState.None);
+        item.description = `${relative}:${finding.line}`;
+        item.tooltip = `${finding.title}\\nSeverity: ${finding.severity}\\nFile: ${relative}\\nLine: ${finding.line}\\n${finding.cwe} · ${finding.confidence} confidence\\n\\nClick to open this location.`;
+        item.iconPath = new vscode.ThemeIcon(finding.severity === "critical" || finding.severity === "high" ? "error" : finding.severity === "medium" ? "warning" : "info");
+        item.command = { command: "routeAtlas.openSecurityFinding", title: "Open finding", arguments: [finding] };
+        return item;
+      }));
+      securityEmitter.fire();
       const diagnostics = vscode.languages.createDiagnosticCollection("Route Atlas Security"); const grouped = new Map();
       const severity = { critical: vscode.DiagnosticSeverity.Error, high: vscode.DiagnosticSeverity.Error, medium: vscode.DiagnosticSeverity.Warning, low: vscode.DiagnosticSeverity.Information };
       for (const finding of findings) {
@@ -436,6 +467,8 @@ function activate(context) {
       const languages = [...languageStats].map(([language, files]) => ({ language, files })).sort((a,b) => b.files-a.files);
       const panel = vscode.window.createWebviewPanel("routeAtlas.dashboard", "Route Atlas — Security & Project", vscode.ViewColumn.Beside, { enableScripts: false });
       panel.webview.html = dashboardHtml({ title: folders.map((folder) => folder.name).join(", "), routes: Array(routeCount), languages, findings });
+      if (findings.length) await securityView.reveal(securityItems[0], { select: false, focus: true });
+      else await vscode.window.showInformationMessage("No matching security indicators were found. This does not prove the project is secure.");
       vscode.window.showInformationMessage("Route Atlas: " + findings.length + " security indicators found. Review the Problems panel; findings are heuristic, not confirmed vulnerabilities.");
     }),
     command("dashboard", () => vscode.commands.executeCommand("routeAtlas.securityScan")),
