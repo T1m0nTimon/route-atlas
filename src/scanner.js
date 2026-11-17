@@ -715,6 +715,12 @@ function merge(routes) {
     known.locations.push(place);
     known.methods = [...new Set([...known.methods, ...route.methods])];
     known.protected = known.protected || route.protected;
+    known.runtime = known.runtime || route.runtime;
+    if (route.runtime) {
+      known.name = route.name || known.name;
+      known.action = route.action || known.action;
+      known.middleware = route.middleware || known.middleware;
+    }
     known.admin = known.admin || route.admin;
     known.guardedElsewhere = known.guardedElsewhere || route.guardedElsewhere;
     if (route.kind === "api") known.kind = "api";
