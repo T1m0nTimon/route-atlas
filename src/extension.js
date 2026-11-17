@@ -468,7 +468,7 @@ function activate(context) {
       const panel = vscode.window.createWebviewPanel("routeAtlas.dashboard", "Route Atlas — Security & Project", vscode.ViewColumn.Beside, { enableScripts: false });
       panel.webview.html = dashboardHtml({ title: folders.map((folder) => folder.name).join(", "), routes: Array(routeCount), languages, findings });
       if (findings.length) await securityView.reveal(securityItems[0], { select: false, focus: true });
-      else await vscode.window.showInformationMessage("No matching security indicators were found. This does not prove the project is secure.");
+
       vscode.window.showInformationMessage("Route Atlas: " + findings.length + " security indicators found. Review the Problems panel; findings are heuristic, not confirmed vulnerabilities.");
     }),
     command("dashboard", () => vscode.commands.executeCommand("routeAtlas.securityScan")),
