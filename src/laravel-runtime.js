@@ -26,11 +26,11 @@ function parseLaravelRoutes(output, root) {
       const middleware = Array.isArray(item.middleware)
         ? item.middleware
         : String(item.middleware || "").split(",").map((value) => value.trim()).filter(Boolean);
-      const uri = item.uri.replace(/^\\//, "");
+      const uri = item.uri.startsWith("/") ? item.uri.slice(1) : item.uri;
       return {
         path: `/${uri}`,
         methods: [...new Set(methods)],
-        kind: /^api(?:\\/|$)/.test(uri) ? "api" : "page",
+        kind: (uri === "api" || uri.startsWith("api/")) ? "api" : "page",
         file: routeFile,
         line: 0,
         source: "Laravel",
