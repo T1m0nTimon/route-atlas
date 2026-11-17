@@ -63,6 +63,23 @@ Example GitHub Actions step:
 
 By default, Route Atlas reads source code without running your application. For Laravel projects, enable the optional runtime scan with `--laravel-runtime` or the VS Code setting `routeAtlas.laravelRuntime`. It runs `php artisan route:list --json` without a shell, with a 15-second timeout, and replaces the incomplete static Laravel results with the registered routes. PHP must be available on PATH. This boots the Laravel application, so service providers and configured integrations may run; enable it only for a trusted project. If PHP is missing or Artisan fails, Route Atlas keeps the static scan. Runtime routes link to `routes/web.php` as a source fallback because Laravel does not include the defining file and line in `route:list --json`. The login check is a hint: it recognizes common decorators and middleware, not every way to protect a route. The link check only looks at addresses written as a plain string or template in known places; links pieced together with `+`, files from a `public` folder and rewrites in the server config are not checked.
 
+### Laravel in Docker
+
+Runtime scanning can use Docker without installing PHP on the host. Set these VS Code settings for a container named `nova-pelican-panel` whose Laravel working directory is `/var/www/html`:
+
+```json
+{
+  "routeAtlas.laravelRuntime": true,
+  "routeAtlas.laravelRuntimeExecutable": "docker",
+  "routeAtlas.laravelRuntimeArgs": [
+    "exec", "-w", "/var/www/html", "nova-pelican-panel",
+    "php", "artisan", "route:list", "--json"
+  ]
+}
+```
+
+The command is passed as an executable plus argument array (never through a shell). Runtime-only routes open a details document showing their Laravel action and middleware; Laravel does not include the original source file and line in `route:list --json`.
+
 ## Settings
 
 | Setting | Meaning |
@@ -74,6 +91,8 @@ By default, Route Atlas reads source code without running your application. For 
 | `routeAtlas.codeLens` | Send buttons above routes in the code |
 | `routeAtlas.diagnostics` | Entries in the Problems panel |
 | `routeAtlas.laravelRuntime` | Run Artisan to include dynamically registered Laravel routes (off by default; trusted projects only) |
+| `routeAtlas.laravelRuntimeExecutable` | Executable for the runtime command, default `php` |
+| `routeAtlas.laravelRuntimeArgs` | Arguments for the runtime command; supports Docker without a shell |
 | `routeAtlas.brokenLinks` | Report links that no route answers |
 | `routeAtlas.ignoreLinks` | Regular expressions for paths that are never reported, for example `^/api/` |
 | `routeAtlas.helpersFile` | Keep TypeScript route helpers in this file up to date, for example `src/routes.gen.ts` |
