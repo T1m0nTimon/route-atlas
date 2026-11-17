@@ -2,6 +2,7 @@
 
 const fs = require("fs/promises");
 const path = require("path");
+const { scanLaravelRuntime } = require("./laravel-runtime");
 
 const SKIP_DIRS = new Set([
   "node_modules", ".git", ".hg", ".svn", ".venv", "venv", "env", "__pycache__", ".tox", ".mypy_cache",
@@ -758,8 +759,18 @@ async function scan(root, options = {}) {
   const routes = [...(await scanFileRouters(files)), ...(await scanCode(root, files, context))];
   applyPythonPrefixes(routes, context, root);
   applyDjangoMounts(routes, context, root);
-  applyNodeMounts(routes, context);
-  return merge(routes.length ? routes : scanStatic(root, files));
+
+  let discovered = routes.length ? routes : scanStatic(root, files);
+  if (options.laravelRuntime) {
+    const runtimeRoutes = await scanLaravelRuntime(root, options.laravelRuntimeOptions);
+    if (runtimeRoutes !== null) {
+      // Runtime registration is authoritative for Laravel. Keep routes from
+      // other detected frameworks, but replace the incomplete Laravel regex scan.
+      discovered = discovered.filter((route) => route.source !== "Laravel").concat(runtimeRoutes);
+    }
+  }
+  applyNodeMounts(discovered, context);
+  return merge(discovered);
 }
 
 module.exports = { scan, normalize, SKIP_DIRS, walk, read, isTestFile, stripComments };
