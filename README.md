@@ -29,6 +29,20 @@ See the [changelog](CHANGELOG.md) for everything.
 - **Export.** Markdown, OpenAPI 3, `.http`, JSON, `sitemap.xml` and TypeScript route helpers.
 - **Favorites**, a filter, and live updates when you save.
 
+## Universal project analysis (0.4.0)
+
+Route Atlas recognizes a broad set of language and project file families, including Python, JavaScript/TypeScript, PHP, Ruby, Java, Kotlin, C#, F#, Go, Rust, Swift, C/C++, Dart, Scala, Groovy, Elixir, Erlang, Haskell, Clojure, R, Julia, Lua, Perl, SQL, Shell, PowerShell, HTML/CSS, GraphQL, Protocol Buffers, YAML, TOML, JSON, Terraform/HCL and common project manifests.
+
+Language recognition is extension/manifest based. Route extraction is framework-aware and is not yet a full parser for every language; unsupported route syntax is not guessed.
+
+### Security scan
+
+Open **Route Atlas → Security** in the left sidebar and click **Start security scan**. You can also use the scan button at the top of the Security view. The scan is local, read-only and does not execute project code. It looks for indicators such as hard-coded credentials/private keys, SQL string-concatenation risks, dynamic evaluation, unsafe shell calls, unsafe HTML insertion, disabled TLS verification, wildcard CORS, weak hashes and debug flags. Findings include file, line, CWE reference, severity and confidence, and appear in the Problems panel and project dashboard.
+
+These checks are heuristic. They can produce false positives and cannot prove that a project is secure. Use dedicated tools such as CodeQL, Semgrep, dependency audits and secret scanners for deeper coverage. Runtime tests and active security testing are not performed automatically.
+
+Run **Route Atlas: Open Project Dashboard** for a visual summary of routes, detected languages and security indicators. After scanning, use **Route Atlas: Export Security Findings as SARIF** to create a SARIF 2.1.0 report for GitHub Code Scanning and compatible security platforms.
+
 ## Supported
 
 - **File-based:** Next.js (app and pages), Nuxt, SvelteKit, SolidStart, Astro, Gatsby, Remix, TanStack Router

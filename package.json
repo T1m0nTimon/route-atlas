@@ -1,8 +1,8 @@
 {
   "name": "route-atlas",
   "displayName": "Route Atlas",
-  "description": "See every page and endpoint of a web project in one sorted tree, jump to the code, send requests, find broken links and generate typed route helpers. Works with Flask, Next.js, Express, Django, Laravel and many more.",
-  "version": "0.3.2",
+  "description": "Universal project intelligence and one-click security checks for VS Code.",
+  "version": "0.4.1",
   "publisher": "t1m0ntimon",
   "license": "MIT",
   "repository": {
@@ -47,14 +47,14 @@
     "onStartupFinished"
   ],
   "scripts": {
-    "test": "node --test test/scanner.test.js test/features.test.js test/links.test.js test/tools.test.js test/cli.test.js test/laravel-runtime.test.js",
+    "test": "node --test test/scanner.test.js test/features.test.js test/links.test.js test/tools.test.js test/cli.test.js test/laravel-runtime.test.js test/universal-security.test.js test/sarif.test.js",
     "package": "npx --yes @vscode/vsce package --no-dependencies"
   },
   "capabilities": {
     "virtualWorkspaces": false,
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Addresses, headers, custom patterns and the route helpers file from an untrusted workspace are ignored.",
+      "description": "Addresses, headers, custom patterns and the route helpers file from an untrusted workspace are ignored. Security scans are read-only and do not execute project code.",
       "restrictedConfigurations": [
         "routeAtlas.baseUrl",
         "routeAtlas.requestHeaders",
@@ -83,6 +83,11 @@
           "id": "routeAtlas.routes",
           "name": "Routes",
           "icon": "media/activity.svg"
+        },
+        {
+          "id": "routeAtlas.security",
+          "name": "Security",
+          "icon": "media/activity.svg"
         }
       ]
     },
@@ -96,6 +101,11 @@
         "view": "routeAtlas.routes",
         "contents": "No routes found in this project.\n[Search again](command:routeAtlas.refresh)",
         "when": "workbenchState != empty && routeAtlas.empty"
+      },
+      {
+        "view": "routeAtlas.security",
+        "contents": "## Project security\n\nScan this project for common security risks. The scan is local and read-only.\n\n[Start security scan](command:routeAtlas.securityScan)",
+        "when": "workbenchState != empty"
       }
     ],
     "commands": [
@@ -196,6 +206,24 @@
         "title": "Generate TypeScript Route Helpers",
         "category": "Route Atlas",
         "icon": "$(symbol-namespace)"
+      },
+      {
+        "command": "routeAtlas.securityScan",
+        "title": "Start Security Scan",
+        "category": "Route Atlas",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "routeAtlas.dashboard",
+        "title": "Open Project Dashboard",
+        "category": "Route Atlas",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "routeAtlas.exportSecuritySarif",
+        "title": "Export Security Findings as SARIF",
+        "category": "Route Atlas",
+        "icon": "$(export)"
       }
     ],
     "keybindings": [
@@ -251,6 +279,11 @@
           "command": "routeAtlas.refresh",
           "when": "view == routeAtlas.routes",
           "group": "1_tools@3"
+        },
+        {
+          "command": "routeAtlas.securityScan",
+          "when": "view == routeAtlas.security",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
