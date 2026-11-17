@@ -44,6 +44,7 @@ The same scanner works without VS Code, for scripts and CI. It needs Node.js 20 
 
 ```bash
 npx github:T1m0nTimon/route-atlas list            # table of all routes
+npx github:T1m0nTimon/route-atlas list . --laravel-runtime  # include Laravel routes registered at runtime
 npx github:T1m0nTimon/route-atlas lint            # broken links, routes handled twice, admin without login check
 npx github:T1m0nTimon/route-atlas export openapi --base-url https://example.com -o openapi.json
 npx github:T1m0nTimon/route-atlas export typescript -o src/routes.gen.ts
@@ -60,7 +61,7 @@ Example GitHub Actions step:
 
 ## Limits
 
-Route Atlas reads your source code and never runs it, so routes built at runtime are missing. The login check is a hint: it recognizes common decorators and middleware, not every way to protect a route. The link check only looks at addresses written as a plain string or template in known places; links pieced together with `+`, files from a `public` folder and rewrites in the server config are not checked.
+By default, Route Atlas reads source code without running your application. For Laravel projects, enable the optional runtime scan with `--laravel-runtime` or the VS Code setting `routeAtlas.laravelRuntime`. It runs `php artisan route:list --json` without a shell, with a 15-second timeout, and replaces the incomplete static Laravel results with the registered routes. PHP must be available on PATH. This boots the Laravel application, so service providers and configured integrations may run; enable it only for a trusted project. If PHP is missing or Artisan fails, Route Atlas keeps the static scan. Runtime routes link to `routes/web.php` as a source fallback because Laravel does not include the defining file and line in `route:list --json`. The login check is a hint: it recognizes common decorators and middleware, not every way to protect a route. The link check only looks at addresses written as a plain string or template in known places; links pieced together with `+`, files from a `public` folder and rewrites in the server config are not checked.
 
 ## Settings
 
@@ -72,6 +73,7 @@ Route Atlas reads your source code and never runs it, so routes built at runtime
 | `routeAtlas.exclude` | More folders to skip |
 | `routeAtlas.codeLens` | Send buttons above routes in the code |
 | `routeAtlas.diagnostics` | Entries in the Problems panel |
+| `routeAtlas.laravelRuntime` | Run Artisan to include dynamically registered Laravel routes (off by default; trusted projects only) |
 | `routeAtlas.brokenLinks` | Report links that no route answers |
 | `routeAtlas.ignoreLinks` | Regular expressions for paths that are never reported, for example `^/api/` |
 | `routeAtlas.helpersFile` | Keep TypeScript route helpers in this file up to date, for example `src/routes.gen.ts` |
@@ -79,7 +81,7 @@ Route Atlas reads your source code and never runs it, so routes built at runtime
 
 ## Privacy
 
-Route Atlas collects nothing and has no telemetry. It only connects to the server address shown in the status bar, and only when you send a request or check routes. Port detection opens a short local connection to `127.0.0.1`.
+Route Atlas collects nothing and has no telemetry. Laravel runtime scanning is off by default and runs only when you enable it; it boots the project through Artisan. It only connects to the server address shown in the status bar, and only when you send a request or check routes. Port detection opens a short local connection to `127.0.0.1`.
 
 ## Development
 
