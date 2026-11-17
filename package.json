@@ -1,8 +1,8 @@
 {
   "name": "route-atlas",
   "displayName": "Route Atlas",
-  "description": "Universal project and route intelligence for VS Code: language detection, visual project overview, static security checks and route analysis.",
-  "version": "0.4.0",
+  "description": "Universal project intelligence and one-click security checks for VS Code.",
+  "version": "0.4.1",
   "publisher": "t1m0ntimon",
   "license": "MIT",
   "repository": {
@@ -83,6 +83,11 @@
           "id": "routeAtlas.routes",
           "name": "Routes",
           "icon": "media/activity.svg"
+        },
+        {
+          "id": "routeAtlas.security",
+          "name": "Security",
+          "icon": "$(shield)"
         }
       ]
     },
@@ -96,6 +101,11 @@
         "view": "routeAtlas.routes",
         "contents": "No routes found in this project.\n[Search again](command:routeAtlas.refresh)",
         "when": "workbenchState != empty && routeAtlas.empty"
+      },
+      {
+        "view": "routeAtlas.security",
+        "contents": "## Project security\n\nScan this project for common security risks. The scan is local and read-only.\n\n[Start security scan](command:routeAtlas.securityScan)",
+        "when": "workbenchState != empty"
       }
     ],
     "commands": [
@@ -199,7 +209,7 @@
       },
       {
         "command": "routeAtlas.securityScan",
-        "title": "Run Security Scan",
+        "title": "Start Security Scan",
         "category": "Route Atlas",
         "icon": "$(shield)"
       },
@@ -269,6 +279,11 @@
           "command": "routeAtlas.refresh",
           "when": "view == routeAtlas.routes",
           "group": "1_tools@3"
+        },
+        {
+          "command": "routeAtlas.securityScan",
+          "when": "view == routeAtlas.security",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
