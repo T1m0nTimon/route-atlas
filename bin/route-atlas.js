@@ -22,7 +22,8 @@ Options
   --json                 Machine-readable output (list, check, lint)
   --base-url <url>       Server address, for example http://127.0.0.1:3000 (export, check)
   --out, -o <file>       Write the output to a file instead of the terminal
-  --laravel-runtime      Read registered Laravel routes with php artisan route:list (runs project code)\n  --exclude <a,b>        More folder names to skip
+  --laravel-runtime      Read registered Laravel routes with php artisan route:list (runs project code)
+  --exclude <a,b>        More folder names to skip
   --ignore-link <regex>  Paths that lint should not report as broken (can be given more than once)
   --fail-on <status>     check: lowest HTTP status that counts as failure (default 500)
   --header <Name: value> check: header for every request (can be given more than once)
@@ -60,7 +61,9 @@ function parse(argv) {
       case "-o":
         options.out = next();
         break;
-      case "--laravel-runtime":\n        options.laravelRuntime = true;\n        break;\n      case "--exclude":
+      case "--laravel-runtime":
+        options.laravelRuntime = true;
+        break;\n      case "--exclude":
         options.exclude.push(...next().split(",").map((item) => item.trim()).filter(Boolean));
         break;
       case "--ignore-link":
