@@ -140,7 +140,13 @@ function activate(context) {
       const exclude = config().get("exclude");
       tree.results = await Promise.all(
         (vscode.workspace.workspaceFolders || []).map(async (folder) => {
-          const routes = await scan(folder.uri.fsPath, { exclude, laravelRuntime: vscode.workspace.isTrusted && config().get("laravelRuntime", false) });
+          const runtimeExecutable = config().get("laravelRuntimeExecutable", "php");
+          const runtimeArgs = config().get("laravelRuntimeArgs", ["artisan", "route:list", "--json"]);
+          const routes = await scan(folder.uri.fsPath, {
+            exclude,
+            laravelRuntime: vscode.workspace.isTrusted && config().get("laravelRuntime", false),
+            laravelRuntimeOptions: { executable: runtimeExecutable, args: runtimeArgs, requireArtisan: runtimeExecutable === "php" },
+          });
           return { folder, routes, ...(await locateServer(folder, routes)) };
         }),
       );
@@ -314,6 +320,17 @@ function activate(context) {
   };
 
   const openRoute = async ({ route }) => {
+    if (route.runtime) {
+      const details = [
+        `${route.methods.join(", ") || "ANY"} ${route.path}`,
+        route.name ? `Name: ${route.name}` : "",
+        route.action ? `Action: ${route.action}` : "",
+        route.middleware && route.middleware.length ? `Middleware: ${route.middleware.join(", ")}` : "",
+        "Registered by the running Laravel application. The defining source file is not included in route:list --json.",
+      ].filter(Boolean).join("\n");
+      await showDocument(`Laravel ${route.path.replace(/[^a-z0-9_-]+/gi, "_")}.txt`, details);
+      return;
+    }
     const document = await vscode.workspace.openTextDocument(route.file);
     const position = new vscode.Position(route.line, 0);
     await vscode.window.showTextDocument(document, { selection: new vscode.Range(position, position), preview: true });
