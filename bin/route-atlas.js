@@ -22,7 +22,7 @@ Options
   --json                 Machine-readable output (list, check, lint)
   --base-url <url>       Server address, for example http://127.0.0.1:3000 (export, check)
   --out, -o <file>       Write the output to a file instead of the terminal
-  --exclude <a,b>        More folder names to skip
+  --laravel-runtime      Read registered Laravel routes with php artisan route:list (runs project code)\n  --exclude <a,b>        More folder names to skip
   --ignore-link <regex>  Paths that lint should not report as broken (can be given more than once)
   --fail-on <status>     check: lowest HTTP status that counts as failure (default 500)
   --header <Name: value> check: header for every request (can be given more than once)
@@ -32,7 +32,7 @@ Options
 Exit codes: 0 fine, 1 problems found, 2 wrong usage.`;
 
 function parse(argv) {
-  const options = { positional: [], ignore: [], headers: {}, exclude: [], failOn: 500 };
+  const options = { positional: [], ignore: [], headers: {}, exclude: [], failOn: 500, laravelRuntime: false };
   const value = (index, flag) => {
     if (index >= argv.length) throw new UsageError(`${flag} needs a value`);
     return argv[index];
@@ -60,7 +60,7 @@ function parse(argv) {
       case "-o":
         options.out = next();
         break;
-      case "--exclude":
+      case "--laravel-runtime":\n        options.laravelRuntime = true;\n        break;\n      case "--exclude":
         options.exclude.push(...next().split(",").map((item) => item.trim()).filter(Boolean));
         break;
       case "--ignore-link":
@@ -193,7 +193,7 @@ async function main(argv) {
   } catch {
     throw new UsageError(`${root} is not a folder`);
   }
-  const routes = await scan(root, { exclude: options.exclude });
+  const routes = await scan(root, { exclude: options.exclude, laravelRuntime: options.laravelRuntime });
   const output = await handler(root, routes, options);
   if (options.out) {
     await fs.writeFile(options.out, output.endsWith("\n") ? output : `${output}\n`);
