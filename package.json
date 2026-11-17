@@ -1,8 +1,8 @@
 {
   "name": "route-atlas",
   "displayName": "Route Atlas",
-  "description": "See every page and endpoint of a web project in one sorted tree, jump to the code, send requests, find broken links and generate typed route helpers. Works with Flask, Next.js, Express, Django, Laravel and many more.",
-  "version": "0.3.2",
+  "description": "Universal project and route intelligence for VS Code: language detection, visual project overview, static security checks and route analysis.",
+  "version": "0.4.0",
   "publisher": "t1m0ntimon",
   "license": "MIT",
   "repository": {
@@ -47,14 +47,14 @@
     "onStartupFinished"
   ],
   "scripts": {
-    "test": "node --test test/scanner.test.js test/features.test.js test/links.test.js test/tools.test.js test/cli.test.js test/laravel-runtime.test.js",
+    "test": "node --test test/scanner.test.js test/features.test.js test/links.test.js test/tools.test.js test/cli.test.js test/laravel-runtime.test.js test/universal-security.test.js",
     "package": "npx --yes @vscode/vsce package --no-dependencies"
   },
   "capabilities": {
     "virtualWorkspaces": false,
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Addresses, headers, custom patterns and the route helpers file from an untrusted workspace are ignored.",
+      "description": "Addresses, headers, custom patterns and the route helpers file from an untrusted workspace are ignored. Security scans are read-only and do not execute project code.",
       "restrictedConfigurations": [
         "routeAtlas.baseUrl",
         "routeAtlas.requestHeaders",
@@ -196,6 +196,18 @@
         "title": "Generate TypeScript Route Helpers",
         "category": "Route Atlas",
         "icon": "$(symbol-namespace)"
+      },
+      {
+        "command": "routeAtlas.securityScan",
+        "title": "Run Security Scan",
+        "category": "Route Atlas",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "routeAtlas.dashboard",
+        "title": "Open Project Dashboard",
+        "category": "Route Atlas",
+        "icon": "$(dashboard)"
       }
     ],
     "keybindings": [
