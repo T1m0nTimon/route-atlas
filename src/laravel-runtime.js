@@ -54,7 +54,7 @@ function parseLaravelRoutes(output, root) {
  * executes its service providers and may connect to external services.
  * Returns null when Laravel/PHP is unavailable so static scanning can continue.
  */
-async function scanLaravelRuntime(root, { timeout = 15000, executable = "php", args = ["artisan", "route:list", "--json"], requireArtisan = executable === "php" } = {}) {
+async function scanLaravelRuntime(root, { timeout = 15000, executable = "php", args = ["artisan", "route:list", "--json"], requireArtisan = executable === "php", onError } = {}) {
   try {
     if (requireArtisan) await fs.access(path.join(root, "artisan"));
     if (typeof executable !== "string" || !executable.trim() || !Array.isArray(args) || !args.every((arg) => typeof arg === "string")) {
@@ -68,7 +68,8 @@ async function scanLaravelRuntime(root, { timeout = 15000, executable = "php", a
       shell: false,
     });
     return parseLaravelRoutes(stdout, root);
-  } catch {
+  } catch (error) {
+    if (typeof onError === "function") onError(error);
     return null;
   }
 }
