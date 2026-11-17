@@ -28,7 +28,7 @@ function parseLaravelRoutes(output, root) {
         : String(item.middleware || "").split(",").map((value) => value.trim()).filter(Boolean);
       const uri = item.uri.startsWith("/") ? item.uri.slice(1) : item.uri;
       return {
-        path: `/${uri}`,
+        path: `/${uri.replace(/\\{(\\w+)(?::[^}]+)?\\??\\}/g, ":$1")}`,
         methods: [...new Set(methods)],
         kind: (uri === "api" || uri.startsWith("api/")) ? "api" : "page",
         file: routeFile,
