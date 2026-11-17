@@ -3,7 +3,10 @@
 const fs = require("fs/promises");
 const path = require("path");
 const vscode = require("vscode");
-const { scan, SKIP_DIRS } = require("./scanner");
+const { scan, SKIP_DIRS, walk } = require("./scanner");
+const { scanSecurity } = require("./security");
+const { summarizeLanguages } = require("./languages");
+const { dashboardHtml } = require("./dashboard");
 const { MODES, findings, matchRoute } = require("./tree");
 const { FORMATS } = require("./exporters");
 const { scanLinks } = require("./links");
@@ -406,6 +409,33 @@ function activate(context) {
         return found ? new vscode.Location(vscode.Uri.file(found.file), new vscode.Position(found.line, 0)) : undefined;
       },
     }),
+    command("securityScan", async () => {
+      if (!vscode.workspace.isTrusted) { vscode.window.showWarningMessage("Security scanning is disabled in Restricted Mode. Trust this workspace to scan its files."); return; }
+      const folders = vscode.workspace.workspaceFolders || []; if (!folders.length) return;
+      const findings = []; const languageStats = new Map(); let routeCount = 0;
+      await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Route Atlas: scanning project security", cancellable: false }, async () => {
+        for (const folder of folders) {
+          const files = await walk(folder.uri.fsPath, { exclude: config().get("exclude") || [] });
+          routeCount += (tree.results.find((item) => item.folder.uri.fsPath === folder.uri.fsPath)?.routes || []).length;
+          for (const item of summarizeLanguages(files)) languageStats.set(item.language, (languageStats.get(item.language) || 0) + item.files);
+          findings.push(...await scanSecurity(folder.uri.fsPath, { exclude: config().get("exclude") || [] }));
+        }
+      });
+      const diagnostics = vscode.languages.createDiagnosticCollection("Route Atlas Security"); const grouped = new Map();
+      const severity = { critical: vscode.DiagnosticSeverity.Error, high: vscode.DiagnosticSeverity.Error, medium: vscode.DiagnosticSeverity.Warning, low: vscode.DiagnosticSeverity.Information };
+      for (const finding of findings) {
+        const uri = vscode.Uri.file(finding.file); const list = grouped.get(uri.toString()) || [];
+        const line = Math.max(0, finding.line - 1); const column = Math.max(0, finding.column);
+        const diagnostic = new vscode.Diagnostic(new vscode.Range(line, column, line, column + 1), finding.title + " (" + finding.cwe + "; " + finding.confidence + " confidence). Review manually; static detection can produce false positives.", severity[finding.severity] || vscode.DiagnosticSeverity.Warning);
+        diagnostic.source = "Route Atlas Security"; diagnostic.code = finding.id; list.push(diagnostic); grouped.set(uri.toString(), list);
+      }
+      for (const [uri, list] of grouped) diagnostics.set(vscode.Uri.parse(uri), list); context.subscriptions.push(diagnostics);
+      const languages = [...languageStats].map(([language, files]) => ({ language, files })).sort((a,b) => b.files-a.files);
+      const panel = vscode.window.createWebviewPanel("routeAtlas.dashboard", "Route Atlas — Security & Project", vscode.ViewColumn.Beside, { enableScripts: false });
+      panel.webview.html = dashboardHtml({ title: folders.map((folder) => folder.name).join(", "), routes: Array(routeCount), languages, findings });
+      vscode.window.showInformationMessage("Route Atlas: " + findings.length + " security indicators found. Review the Problems panel; findings are heuristic, not confirmed vulnerabilities.");
+    }),
+    command("dashboard", () => vscode.commands.executeCommand("routeAtlas.securityScan")),
     command("refresh", refresh),
     command("filter", async () => {
       const value = await vscode.window.showInputBox({ title: t("Filter routes"), value: tree.filter, prompt: t("Path, method or framework") });
