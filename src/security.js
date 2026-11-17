@@ -72,7 +72,7 @@ async function walkSource(root, exclude = []) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         if (!skip.has(entry.name)) pending.push(full);
-      } else if (entry.isFile() && (SOURCE_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) || entry.name === "Dockerfile")) {
+      } else if (entry.isFile() && (SOURCE_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) || entry.name === "Dockerfile" || entry.name === ".env" || /^\\.env\\.(?!example$|sample$|template$)[a-z0-9_-]+$/i.test(entry.name))) {
         if (/\.env\.(?:example|sample|template)$/i.test(entry.name)) continue;
         files.push(full);
       }
