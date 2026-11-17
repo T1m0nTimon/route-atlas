@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Add broad language and project-manifest recognition.
+- Expand source discovery for C/C++, Swift, Dart, Scala, Elixir, Haskell, SQL, shell, Terraform and configuration formats.
+- Add a local, read-only heuristic security scanner with CWE references and VS Code Problems diagnostics.
+- Add a visual project/security dashboard.
+- Keep security analysis separate from route extraction; unsupported route grammars are not guessed.
+
 ## 0.3.1
 
 - Optional Laravel runtime scanning via `php artisan route:list --json`, so routes registered by service providers and plugins can be discovered
