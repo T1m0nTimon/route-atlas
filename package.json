@@ -87,7 +87,7 @@
         {
           "id": "routeAtlas.security",
           "name": "Security",
-          "icon": "$(shield)"
+          "icon": "media/activity.svg"
         }
       ]
     },
