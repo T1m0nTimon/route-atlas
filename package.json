@@ -2,7 +2,7 @@
   "name": "route-atlas",
   "displayName": "Route Atlas",
   "description": "See every page and endpoint of a web project in one sorted tree, jump to the code, send requests, find broken links and generate typed route helpers. Works with Flask, Next.js, Express, Django, Laravel and many more.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "t1m0ntimon",
   "license": "MIT",
   "repository": {
@@ -61,7 +61,9 @@
         "routeAtlas.categories",
         "routeAtlas.ignoreLinks",
         "routeAtlas.helpersFile",
-        "routeAtlas.laravelRuntime"
+        "routeAtlas.laravelRuntime",
+        "routeAtlas.laravelRuntimeExecutable",
+        "routeAtlas.laravelRuntimeArgs"
       ]
     }
   },
@@ -424,6 +426,23 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Run `php artisan route:list --json` to include dynamically registered Laravel routes. This boots the project and may execute service providers or connect to configured services. Enable only for a trusted project."
+        },
+        "routeAtlas.laravelRuntimeExecutable": {
+          "type": "string",
+          "default": "php",
+          "markdownDescription": "Executable used for Laravel runtime scanning. For Docker, use `docker` and configure `routeAtlas.laravelRuntimeArgs`."
+        },
+        "routeAtlas.laravelRuntimeArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "artisan",
+            "route:list",
+            "--json"
+          ],
+          "markdownDescription": "Arguments passed to the Laravel runtime executable without a shell. Docker example: `[\"exec\", \"-w\", \"/var/www/html\", \"nova-pelican-panel\", \"php\", \"artisan\", \"route:list\", \"--json\"]`."
         }
       }
     }
