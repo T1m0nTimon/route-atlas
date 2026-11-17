@@ -155,7 +155,7 @@
         "command": "routeAtlas.configureLaravelRuntime",
         "title": "Configure Laravel / Docker Route Scan",
         "category": "Route Atlas",
-        "icon": "$(server-process)"
+        "icon": "$(server)"
       },
       {
         "command": "routeAtlas.refresh",
