@@ -68,11 +68,11 @@ async function walkSource(root, exclude = []) {
     let entries;
     try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { continue; }
     for (const entry of entries) {
-      if (entry.name.startsWith(".") && entry.name !== ".env" && entry.name !== ".env.local") continue;
+      if (entry.name.startsWith(".") && entry.name !== ".env" && !entry.name.startsWith(".env.")) continue;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         if (!skip.has(entry.name)) pending.push(full);
-      } else if (entry.isFile() && (SOURCE_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) || entry.name === "Dockerfile" || entry.name === ".env" || /^\\.env\\.(?!example$|sample$|template$)[a-z0-9_-]+$/i.test(entry.name))) {
+      } else if (entry.isFile() && (SOURCE_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) || entry.name === "Dockerfile" || entry.name === ".env" || /^\.env\.(?!example$|sample$|template$)[a-z0-9_-]+$/i.test(entry.name))) {
         if (/\.env\.(?:example|sample|template)$/i.test(entry.name)) continue;
         files.push(full);
       }
