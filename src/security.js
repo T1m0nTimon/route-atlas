@@ -10,7 +10,7 @@ const SOURCE_EXTENSIONS = new Set([
   ".env", ".ini", ".conf", ".config", ".properties", ".gradle", ".tfvars",
 ]);
 const MAX_FILE_SIZE = 1024 * 1024;
-const PLACEHOLDER = /^(?:your[_ -]?.*|change[_ -]?me|example|sample|dummy|placeholder|xxx+|<.*>|\*+|)$/i;
+const PLACEHOLDER = /^(?:your[_ -]?.*|change[_ -]?me(?:[_ -].*)?|example|sample|dummy|placeholder|xxx+|<.*>|\*+|)$/i;
 
 const RULES = [
   { id:"secret-hardcoded", severity:"critical", cwe:"CWE-798", title:"Möglicherweise fest codiertes Geheimnis", confidence:"medium",
