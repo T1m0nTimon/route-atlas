@@ -7,6 +7,7 @@ const { scan, SKIP_DIRS, walk } = require("./scanner");
 const { scanSecurity } = require("./security");
 const { summarizeLanguages } = require("./languages");
 const { dashboardHtml } = require("./dashboard");
+const { toSarif } = require("./sarif");
 const { MODES, findings, matchRoute } = require("./tree");
 const { FORMATS } = require("./exporters");
 const { scanLinks } = require("./links");
@@ -71,6 +72,7 @@ function activate(context) {
   let running = false;
   let again = false;
   let serial = 0;
+  let latestSecurityFindings = [];
 
   const showState = () => {
     const total = tree.results.reduce((sum, result) => sum + tree.visible(result.routes).length, 0);
@@ -421,6 +423,7 @@ function activate(context) {
           findings.push(...await scanSecurity(folder.uri.fsPath, { exclude: config().get("exclude") || [] }));
         }
       });
+      latestSecurityFindings = findings;
       const diagnostics = vscode.languages.createDiagnosticCollection("Route Atlas Security"); const grouped = new Map();
       const severity = { critical: vscode.DiagnosticSeverity.Error, high: vscode.DiagnosticSeverity.Error, medium: vscode.DiagnosticSeverity.Warning, low: vscode.DiagnosticSeverity.Information };
       for (const finding of findings) {
@@ -436,6 +439,18 @@ function activate(context) {
       vscode.window.showInformationMessage("Route Atlas: " + findings.length + " security indicators found. Review the Problems panel; findings are heuristic, not confirmed vulnerabilities.");
     }),
     command("dashboard", () => vscode.commands.executeCommand("routeAtlas.securityScan")),
+    command("exportSecuritySarif", async () => {
+      if (!latestSecurityFindings.length) {
+        const choice = await vscode.window.showWarningMessage("Run a security scan first. Export an empty report anyway?", "Export empty report");
+        if (choice !== "Export empty report") return;
+      }
+      const folders = vscode.workspace.workspaceFolders || []; if (!folders.length) return;
+      const uri = await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(path.join(folders[0].uri.fsPath, "route-atlas-security.sarif")), filters: { "SARIF report": ["sarif", "json"] }, title: "Export Route Atlas security findings" });
+      if (!uri) return;
+      const report = toSarif(latestSecurityFindings, folders[0].uri.fsPath);
+      await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(report, null, 2) + "\\n", "utf8"));
+      vscode.window.showInformationMessage("SARIF report exported. You can upload it to GitHub Code Scanning or another SARIF-compatible tool.");
+    }),
     command("refresh", refresh),
     command("filter", async () => {
       const value = await vscode.window.showInputBox({ title: t("Filter routes"), value: tree.filter, prompt: t("Path, method or framework") });
