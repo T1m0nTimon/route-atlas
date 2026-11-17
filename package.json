@@ -2,7 +2,7 @@
   "name": "route-atlas",
   "displayName": "Route Atlas",
   "description": "Universal project intelligence and one-click security checks for VS Code.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "publisher": "t1m0ntimon",
   "license": "MIT",
   "repository": {
@@ -140,6 +140,24 @@
         "icon": "$(server)"
       },
       {
+        "command": "routeAtlas.copyAllRoutes",
+        "title": "Copy All Routes",
+        "category": "Route Atlas",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "routeAtlas.generateAiPrompt",
+        "title": "Generate AI Prompt",
+        "category": "Route Atlas",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "routeAtlas.configureLaravelRuntime",
+        "title": "Configure Laravel / Docker Route Scan",
+        "category": "Route Atlas",
+        "icon": "$(server)"
+      },
+      {
         "command": "routeAtlas.refresh",
         "title": "Search Again",
         "category": "Route Atlas",
@@ -259,6 +277,21 @@
           "command": "routeAtlas.checkAll",
           "when": "view == routeAtlas.routes",
           "group": "navigation@4"
+        },
+        {
+          "command": "routeAtlas.copyAllRoutes",
+          "when": "view == routeAtlas.routes",
+          "group": "navigation@5"
+        },
+        {
+          "command": "routeAtlas.generateAiPrompt",
+          "when": "view == routeAtlas.routes",
+          "group": "navigation@6"
+        },
+        {
+          "command": "routeAtlas.configureLaravelRuntime",
+          "when": "view == routeAtlas.routes",
+          "group": "1_tools@0"
         },
         {
           "command": "routeAtlas.export",

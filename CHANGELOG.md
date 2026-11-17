@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2
+
+- Add one-click copy of the complete detected route inventory.
+- Add an AI prompt generator that includes route methods, source locations, Laravel names/actions and runtime status.
+- Add a guided Laravel runtime setup for local PHP or Docker containers, with visible runtime scan errors instead of silent fallback.
+
+
 ## 0.4.1
 
 - Add a dedicated Security view in the Route Atlas sidebar.
