@@ -2,7 +2,7 @@
   "name": "route-atlas",
   "displayName": "Route Atlas",
   "description": "Universal project intelligence and one-click security checks for VS Code.",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "publisher": "t1m0ntimon",
   "license": "MIT",
   "repository": {

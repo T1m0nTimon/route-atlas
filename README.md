@@ -137,5 +137,5 @@ Route Atlas collects nothing and has no telemetry. Laravel runtime scanning is o
 ```
 npm test
 npm run package
-code --install-extension route-atlas-0.3.0.vsix
+code --install-extension route-atlas-0.5.0.vsix
 ```

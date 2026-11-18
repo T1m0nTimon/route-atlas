@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
 
 - **AI security prompt.** One click turns the security findings into a Markdown prompt for ChatGPT, Claude, Copilot and others: instructions, attack surface, and every finding with a code snippet. Secrets are redacted. Large reports are split into self-contained parts of at most `routeAtlas.aiPromptMaxChars` characters (default 20000). The files land in `.route-atlas/`, which ignores itself in Git, so coding agents in the project can read them directly. Also on the command line: `route-atlas ai`.
 - **Route graph.** A force-directed map of areas, routes, source files and findings, coloured by area, with search, cluster hulls, a security heatmap, labels, force and zoom controls. Double-click a node to open its code.
