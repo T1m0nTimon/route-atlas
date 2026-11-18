@@ -90,7 +90,7 @@ Example GitHub Actions step:
 
 ## Limits
 
-By default, Route Atlas reads source code without running your application. For Laravel projects, enable the optional runtime scan with `--laravel-runtime` or the VS Code setting `routeAtlas.laravelRuntime`. It runs `php artisan route:list --json` without a shell, with a 15-second timeout, and replaces the incomplete static Laravel results with the registered routes. PHP must be available on PATH. This boots the Laravel application, so service providers and configured integrations may run; enable it only for a trusted project. If PHP is missing or Artisan fails, Route Atlas keeps the static scan. Runtime routes link to `routes/web.php` as a source fallback because Laravel does not include the defining file and line in `route:list --json`. The login check is a hint: it recognizes common decorators and middleware, not every way to protect a route. The link check only looks at addresses written as a plain string or template in known places; links pieced together with `+`, files from a `public` folder and rewrites in the server config are not checked.
+By default, Route Atlas reads source code without running your application. For Laravel projects, enable the optional runtime scan with `--laravel-runtime` or the VS Code setting `routeAtlas.laravelRuntime`. It runs `php artisan route:list --json` without a shell, with a 60-second timeout, and replaces the incomplete static Laravel results with the registered routes. PHP must be available on PATH. This boots the Laravel application, so service providers and configured integrations may run; enable it only for a trusted project. If PHP is missing or Artisan fails, Route Atlas keeps the static scan and shows the reason in a warning. Runtime routes link to `routes/web.php` as a source fallback because Laravel does not include the defining file and line in `route:list --json`. The login check is a hint: it recognizes common decorators and middleware, not every way to protect a route. The link check only looks at addresses written as a plain string or template in known places; links pieced together with `+`, files from a `public` folder and rewrites in the server config are not checked.
 
 ### Laravel in Docker
 
@@ -136,6 +136,9 @@ Route Atlas collects nothing and has no telemetry. Laravel runtime scanning is o
 
 ```
 npm test
+npm run test:vscode   # end-to-end in the installed VS Code
 npm run package
-code --install-extension route-atlas-0.5.0.vsix
+code --install-extension route-atlas-0.5.1.vsix
 ```
+
+`npm run test:vscode` opens a separate VS Code window with a fresh profile on a copy of `test/vscode/fixture` and closes it when done. Set `VSCODE_EXECUTABLE` if VS Code is not installed in its default place.

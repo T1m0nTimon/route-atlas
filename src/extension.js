@@ -4,20 +4,13 @@ const fs = require("fs/promises");
 const path = require("path");
 const vscode = require("vscode");
 const { scan, SKIP_DIRS, walk } = require("./scanner");
-const { scanSecurity } = require("./security");
-const { summarizeLanguages } = require("./languages");
-const { dashboardHtml } = require("./dashboard");
-const { toSarif } = require("./sarif");
-const { toAiPrompt } = require("./ai-report");
-const { buildGraph, graphHtml } = require("./graph");
 const { MODES, findings, matchRoute } = require("./tree");
-const { FORMATS } = require("./exporters");
 const { scanLinks } = require("./links");
-const { SNIPPETS } = require("./snippets");
 const { toTypeScript } = require("./typed");
 const { findServer, send, checkAll, checkable, isLocal } = require("./http");
 const { createTranslator, resolveLanguage } = require("./i18n");
 const { RouteTree } = require("./view");
+// Modules only needed after a click are required where they are used: VS Code counts every file read during activation.
 
 const FRAMEWORK_PORTS = {
   "Next.js": 3000, Nuxt: 3000, Remix: 3000, Express: 3000, Rails: 3000, NestJS: 3000, SvelteKit: 5173, "Vue Router": 5173,
@@ -66,7 +59,18 @@ function systemLocale() {
 }
 
 function activate(context) {
-  const t = createTranslator(resolveLanguage(config().get("language"), vscode.env.language, systemLocale()));
+  const setting = config().get("language");
+  let translate = createTranslator(resolveLanguage(setting, vscode.env.language, ""));
+  const t = (...args) => translate(...args);
+  // The first Intl call loads ICU data and can take seconds, so the system language is checked after activation.
+  if (setting !== "de" && setting !== "en" && !vscode.env.language.startsWith("de")) {
+    setTimeout(() => {
+      if (resolveLanguage(setting, vscode.env.language, systemLocale()) !== "de") return;
+      translate = createTranslator("de");
+      tree.refresh();
+      showState();
+    }, 0);
+  }
   const tree = new RouteTree({ state: context.workspaceState, t });
   const view = vscode.window.createTreeView("routeAtlas.routes", { treeDataProvider: tree, showCollapseAll: true });
   const securityItems = [];
@@ -75,6 +79,8 @@ function activate(context) {
     onDidChangeTreeData: securityEmitter.event,
     getTreeItem: (item) => item,
     getChildren: () => securityItems,
+    // A flat list: VS Code needs getParent for securityView.reveal() and throws without it.
+    getParent: () => undefined,
   };
   const securityView = vscode.window.createTreeView("routeAtlas.security", {
     treeDataProvider: securityProvider,
@@ -155,6 +161,29 @@ function activate(context) {
     for (const [file, list] of perFile) problems.set(vscode.Uri.file(file), list);
   };
 
+  const reportedRuntimeErrors = new Set();
+  const reportRuntimeError = async (executable, error) => {
+    const reason = String(error.message || error).split("\n")[0].slice(0, 300);
+    if (reportedRuntimeErrors.has(reason)) return;
+    reportedRuntimeErrors.add(reason);
+    const open = t("Open settings");
+    const choice = await vscode.window.showWarningMessage(t("Laravel routes could not be read with {0}: {1}. Showing only the routes found in the code.", executable, reason), open);
+    if (choice === open) vscode.commands.executeCommand("workbench.action.openSettings", "routeAtlas.laravelRuntime");
+  };
+
+  /** The code scan misses Laravel routes from packages and runtime registration; offer the complete list once. */
+  const suggestLaravelRuntime = async (folder, routes) => {
+    if (config().get("laravelRuntime") || context.workspaceState.get("laravelRuntimeSuggested")) return;
+    if (!routes.some((route) => route.source === "Laravel")) return;
+    try { await fs.access(path.join(folder.uri.fsPath, "artisan")); } catch { return; }
+    await context.workspaceState.update("laravelRuntimeSuggested", true);
+    const enable = t("Turn on");
+    const settings = t("Open settings");
+    const choice = await vscode.window.showInformationMessage(t("Route Atlas reads Laravel routes from the code and misses routes from packages. Read all registered routes with php artisan route:list? This runs the project's code."), enable, settings);
+    if (choice === enable) await config().update("laravelRuntime", true, vscode.ConfigurationTarget.Workspace);
+    if (choice === settings) vscode.commands.executeCommand("workbench.action.openSettings", "routeAtlas.laravelRuntime");
+  };
+
   const refresh = async () => {
     if (running) {
       again = true;
@@ -170,8 +199,14 @@ function activate(context) {
           const routes = await scan(folder.uri.fsPath, {
             exclude,
             laravelRuntime: vscode.workspace.isTrusted && config().get("laravelRuntime", false),
-            laravelRuntimeOptions: { executable: runtimeExecutable, args: runtimeArgs, requireArtisan: runtimeExecutable === "php" },
+            laravelRuntimeOptions: {
+              executable: runtimeExecutable,
+              args: runtimeArgs,
+              requireArtisan: runtimeExecutable === "php",
+              onError: (error) => reportRuntimeError(runtimeExecutable, error),
+            },
           });
+          suggestLaravelRuntime(folder, routes);
           return { folder, routes, ...(await locateServer(folder, routes)) };
         }),
       );
@@ -326,7 +361,7 @@ function activate(context) {
 
   const copyAs = async (node) => {
     const { route, result } = target(node);
-    const format = await vscode.window.showQuickPick(SNIPPETS, { title: t("Copy {0} as", route.path) });
+    const format = await vscode.window.showQuickPick(require("./snippets").SNIPPETS, { title: t("Copy {0} as", route.path) });
     if (!format) return;
     let method = route.methods[0] || "GET";
     if (route.methods.length > 1) {
@@ -378,8 +413,8 @@ function activate(context) {
         for (const folder of folders) {
           const files = await walk(folder.uri.fsPath, { exclude: config().get("exclude") || [] });
           routeCount += (tree.results.find((item) => item.folder.uri.fsPath === folder.uri.fsPath)?.routes || []).length;
-          for (const item of summarizeLanguages(files)) languageStats.set(item.language, (languageStats.get(item.language) || 0) + item.files);
-          findings.push(...await scanSecurity(folder.uri.fsPath, { exclude: config().get("exclude") || [] }));
+          for (const item of require("./languages").summarizeLanguages(files)) languageStats.set(item.language, (languageStats.get(item.language) || 0) + item.files);
+          findings.push(...await require("./security").scanSecurity(folder.uri.fsPath, { exclude: config().get("exclude") || [] }));
         }
       });
       latestSecurityFindings = findings;
@@ -415,7 +450,7 @@ function activate(context) {
     const [folder] = scanned.folders;
     const root = folder.uri.fsPath;
     const routeIssues = tree.results.flatMap((result) => findings(result.routes, config().get("categories")).filter((item) => item.type === "unprotected"));
-    const parts = await toAiPrompt({
+    const parts = await require("./ai-report").toAiPrompt({
       title: scanned.folders.map((item) => item.name).join(", "),
       root,
       routes: tree.results.flatMap((result) => result.routes),
@@ -443,9 +478,10 @@ function activate(context) {
   };
 
   let graphPanel;
+  let graphRendered = 0;
   let graphTargets = new Map();
   const graphData = () => {
-    const data = buildGraph({
+    const data = require("./graph").buildGraph({
       results: tree.results.map((result) => ({ root: result.folder.uri.fsPath, name: result.folder.name, routes: result.routes })),
       findings: latestSecurityFindings,
       rules: config().get("categories"),
@@ -459,7 +495,7 @@ function activate(context) {
     const media = vscode.Uri.joinPath(context.extensionUri, "media");
     graphPanel = vscode.window.createWebviewPanel("routeAtlas.graph", t("Route graph"), vscode.ViewColumn.Active, { enableScripts: true, localResourceRoots: [media], retainContextWhenHidden: true });
     const labels = Object.fromEntries(Object.entries(GRAPH_LABELS).map(([key, text]) => [key, t(text)]));
-    graphPanel.webview.html = graphHtml({
+    graphPanel.webview.html = require("./graph").graphHtml({
       data: graphData(),
       labels,
       nonce: require("crypto").randomBytes(16).toString("base64"),
@@ -468,6 +504,7 @@ function activate(context) {
     });
     graphPanel.webview.onDidReceiveMessage(async (message) => {
       if (message && message.type === "aiPrompt") return aiPrompt();
+      if (message && message.type === "rendered") graphRendered = Number(message.nodes) || 0;
       // Only ids the extension handed out: the webview never chooses a file path itself.
       const node = message && message.type === "open" && graphTargets.get(message.id);
       if (!node) return;
@@ -555,7 +592,7 @@ function activate(context) {
       if (!scanned) return;
       const { findings, languages, routeCount, folders } = scanned;
       const panel = vscode.window.createWebviewPanel("routeAtlas.dashboard", "Route Atlas — Security & Project", vscode.ViewColumn.Beside, { enableScripts: false });
-      panel.webview.html = dashboardHtml({ title: folders.map((folder) => folder.name).join(", "), routes: Array(routeCount), languages, findings });
+      panel.webview.html = require("./dashboard").dashboardHtml({ title: folders.map((folder) => folder.name).join(", "), routes: Array(routeCount), languages, findings });
       if (findings.length) await securityView.reveal(securityItems[0], { select: false, focus: true });
 
       vscode.window.showInformationMessage("Route Atlas: " + findings.length + " security indicators found. Review the Problems panel; findings are heuristic, not confirmed vulnerabilities.");
@@ -571,7 +608,7 @@ function activate(context) {
       const folders = vscode.workspace.workspaceFolders || []; if (!folders.length) return;
       const uri = await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(path.join(folders[0].uri.fsPath, "route-atlas-security.sarif")), filters: { "SARIF report": ["sarif", "json"] }, title: "Export Route Atlas security findings" });
       if (!uri) return;
-      const report = toSarif(latestSecurityFindings, folders[0].uri.fsPath);
+      const report = require("./sarif").toSarif(latestSecurityFindings, folders[0].uri.fsPath);
       await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(report, null, 2) + "\n", "utf8"));
       vscode.window.showInformationMessage("SARIF report exported. You can upload it to GitHub Code Scanning or another SARIF-compatible tool.");
     }),
@@ -682,7 +719,7 @@ function activate(context) {
       }
     }),
     command("export", async () => {
-      const format = await vscode.window.showQuickPick(FORMATS, { title: t("Export routes") });
+      const format = await vscode.window.showQuickPick(require("./exporters").FORMATS, { title: t("Export routes") });
       if (!format || !tree.results.length) return;
       const [result] = tree.results;
       const content = format.render(tree.visible(result.routes), {
@@ -695,6 +732,8 @@ function activate(context) {
     }),
   );
   refresh();
+  // Read-only view for the end-to-end test in a real VS Code.
+  return { results: () => tree.results, graphNodes: () => graphRendered };
 }
 
 function deactivate() {}

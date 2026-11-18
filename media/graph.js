@@ -312,6 +312,7 @@
   window.addEventListener("message", (event) => { if (event.data && event.data.type === "data") load(event.data.data); });
 
   load(JSON.parse(document.getElementById("data").textContent));
+  requestAnimationFrame(() => vscode.postMessage({ type: "rendered", nodes: nodes.length }));
   setCharge(state.charge || charge);
   alpha = 1;
   frame();

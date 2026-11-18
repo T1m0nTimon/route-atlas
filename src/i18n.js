@@ -75,6 +75,10 @@ const GERMAN = {
   "reset selection": "Auswahl zurücksetzen",
   "fade unselected nodes": "Nicht gewählte ausblenden",
   "Double-click opens the code": "Doppelklick öffnet den Code",
+  "Open settings": "Einstellungen öffnen",
+  "Turn on": "Einschalten",
+  "Laravel routes could not be read with {0}: {1}. Showing only the routes found in the code.": "Laravel-Routen konnten mit {0} nicht gelesen werden: {1}. Es werden nur die im Code gefundenen Seiten gezeigt.",
+  "Route Atlas reads Laravel routes from the code and misses routes from packages. Read all registered routes with php artisan route:list? This runs the project's code.": "Route Atlas liest Laravel-Routen aus dem Code und übersieht Routen aus Paketen. Alle registrierten Routen mit php artisan route:list lesen? Dabei läuft der Code des Projekts.",
 };
 
 function createTranslator(language) {

@@ -1,0 +1,5 @@
+{
+  "routeAtlas.laravelRuntime": true,
+  "routeAtlas.laravelRuntimeExecutable": "node",
+  "routeAtlas.laravelRuntimeArgs": ["-e", "console.log(JSON.stringify([{ uri: 'panel/servers/{server}', methods: ['GET', 'HEAD'], middleware: ['auth'] }]))"]
+}

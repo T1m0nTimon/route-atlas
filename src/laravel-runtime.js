@@ -2,10 +2,7 @@
 
 const fs = require("fs/promises");
 const path = require("path");
-const { execFile } = require("child_process");
 const { promisify } = require("util");
-
-const execFileAsync = promisify(execFile);
 
 /**
  * Convert Laravel's route:list JSON into Route Atlas records.
@@ -54,13 +51,14 @@ function parseLaravelRoutes(output, root) {
  * executes its service providers and may connect to external services.
  * Returns null when Laravel/PHP is unavailable so static scanning can continue.
  */
-async function scanLaravelRuntime(root, { timeout = 15000, executable = "php", args = ["artisan", "route:list", "--json"], requireArtisan = executable === "php" } = {}) {
+async function scanLaravelRuntime(root, { timeout = 60000, executable = "php", args = ["artisan", "route:list", "--json"], requireArtisan = executable === "php", onError } = {}) {
   try {
     if (requireArtisan) await fs.access(path.join(root, "artisan"));
     if (typeof executable !== "string" || !executable.trim() || !Array.isArray(args) || !args.every((arg) => typeof arg === "string")) {
       throw new Error("Invalid Laravel runtime command configuration");
     }
-    const { stdout } = await execFileAsync(executable, args, {
+    // Required here: child_process is only needed when the runtime scan is on.
+    const { stdout } = await promisify(require("child_process").execFile)(executable, args, {
       cwd: root,
       timeout,
       maxBuffer: 8 * 1024 * 1024,
@@ -68,7 +66,9 @@ async function scanLaravelRuntime(root, { timeout = 15000, executable = "php", a
       shell: false,
     });
     return parseLaravelRoutes(stdout, root);
-  } catch {
+  } catch (error) {
+    // Without a reason the user only sees "too few routes" and cannot fix the command.
+    if (onError) onError(error.killed ? new Error(`timed out after ${timeout / 1000} s`) : error);
     return null;
   }
 }

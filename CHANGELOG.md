@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1
+
+- Fix: the security scan threw an error in VS Code as soon as it found something, so its summary never appeared (the Security view could not be revealed).
+- New end-to-end test `npm run test:vscode`: starts the installed VS Code on a sample project and checks activation, routes with prefixes and Laravel runtime routes, every registered command, the security scan, the AI prompt without secrets and the rendered route graph.
+- Faster start: the system language is checked after activation (the first `Intl` call can take seconds), and modules needed only after a click load on first use. Activation work dropped from up to 360 ms to under 10 ms in a local measurement.
+- Laravel runtime scan: a failing `route:list` command now shows its reason instead of silently falling back, the timeout is 60 s instead of 15 s for slow machines and containers, and Laravel projects get a one-time offer to turn the runtime scan on.
+
 ## 0.5.0
 
 - **AI security prompt.** One click turns the security findings into a Markdown prompt for ChatGPT, Claude, Copilot and others: instructions, attack surface, and every finding with a code snippet. Secrets are redacted. Large reports are split into self-contained parts of at most `routeAtlas.aiPromptMaxChars` characters (default 20000). The files land in `.route-atlas/`, which ignores itself in Git, so coding agents in the project can read them directly. Also on the command line: `route-atlas ai`.

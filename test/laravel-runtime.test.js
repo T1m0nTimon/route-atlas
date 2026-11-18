@@ -26,3 +26,11 @@ test("parses Laravel route:list JSON including methods, middleware and API route
 test("rejects unexpected route:list JSON shapes", () => {
   assert.throws(() => parseLaravelRoutes('{"routes":[]}', "/project"), /JSON array/);
 });
+
+test("a failing runtime command reports why instead of failing silently", async () => {
+  const { scanLaravelRuntime } = require("../src/laravel-runtime");
+  let reported;
+  const result = await scanLaravelRuntime(process.cwd(), { executable: "route-atlas-missing-binary", args: [], onError: (error) => { reported = error; } });
+  assert.equal(result, null);
+  assert.match(String(reported && reported.message), /ENOENT|not found|nicht gefunden/i);
+});

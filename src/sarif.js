@@ -48,7 +48,7 @@ function toSarif(findings, workspaceRoot) {
       tool: {
         driver: {
           name: "Route Atlas",
-          version: "0.5.0",
+          version: "0.5.1",
           informationUri: "https://github.com/T1m0nTimon/route-atlas",
           rules,
         },

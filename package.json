@@ -2,7 +2,7 @@
   "name": "route-atlas",
   "displayName": "Route Atlas",
   "description": "Universal project intelligence and one-click security checks for VS Code.",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "publisher": "t1m0ntimon",
   "license": "MIT",
   "repository": {
@@ -48,7 +48,8 @@
   ],
   "scripts": {
     "test": "node --test test/scanner.test.js test/features.test.js test/links.test.js test/tools.test.js test/cli.test.js test/laravel-runtime.test.js test/universal-security.test.js test/sarif.test.js test/ai-graph.test.js",
-    "package": "npx --yes @vscode/vsce package --no-dependencies"
+    "package": "npx --yes @vscode/vsce package --no-dependencies",
+    "test:vscode": "node test/vscode/run.js"
   },
   "capabilities": {
     "virtualWorkspaces": false,
