@@ -47,7 +47,7 @@
     "onStartupFinished"
   ],
   "scripts": {
-    "test": "node --test test/scanner.test.js test/features.test.js test/links.test.js test/tools.test.js test/cli.test.js test/laravel-runtime.test.js test/universal-security.test.js test/sarif.test.js",
+    "test": "node --test test/scanner.test.js test/features.test.js test/links.test.js test/tools.test.js test/cli.test.js test/laravel-runtime.test.js test/universal-security.test.js test/sarif.test.js test/ai-graph.test.js",
     "package": "npx --yes @vscode/vsce package --no-dependencies"
   },
   "capabilities": {
@@ -104,7 +104,7 @@
       },
       {
         "view": "routeAtlas.security",
-        "contents": "## Project security\n\nScan this project for common security risks. The scan is local and read-only.\n\n[Start security scan](command:routeAtlas.securityScan)",
+        "contents": "## Project security\n\nScan this project for common security risks. The scan is local and read-only.\n\n[Start security scan](command:routeAtlas.securityScan)\n\n[Create AI security prompt](command:routeAtlas.aiPrompt)\n\n[Open route graph](command:routeAtlas.graph)",
         "when": "workbenchState != empty"
       }
     ],
@@ -224,6 +224,18 @@
         "title": "Export Security Findings as SARIF",
         "category": "Route Atlas",
         "icon": "$(export)"
+      },
+      {
+        "command": "routeAtlas.aiPrompt",
+        "title": "Create AI Security Prompt (Markdown)",
+        "category": "Route Atlas",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "routeAtlas.graph",
+        "title": "Open Route Graph",
+        "category": "Route Atlas",
+        "icon": "$(type-hierarchy)"
       }
     ],
     "keybindings": [
@@ -284,6 +296,21 @@
           "command": "routeAtlas.securityScan",
           "when": "view == routeAtlas.security",
           "group": "navigation@1"
+        },
+        {
+          "command": "routeAtlas.graph",
+          "when": "view == routeAtlas.routes",
+          "group": "navigation@5"
+        },
+        {
+          "command": "routeAtlas.aiPrompt",
+          "when": "view == routeAtlas.security",
+          "group": "navigation@2"
+        },
+        {
+          "command": "routeAtlas.graph",
+          "when": "view == routeAtlas.security",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -476,6 +503,12 @@
             "--json"
           ],
           "markdownDescription": "Arguments passed to the Laravel runtime executable without a shell. Docker example: `[\"exec\", \"-w\", \"/var/www/html\", \"nova-pelican-panel\", \"php\", \"artisan\", \"route:list\", \"--json\"]`."
+        },
+        "routeAtlas.aiPromptMaxChars": {
+          "type": "number",
+          "default": 20000,
+          "minimum": 4000,
+          "markdownDescription": "Largest size of one AI prompt part in characters. 20000 characters (about 5000 tokens) fit into the chat box of every common AI. Bigger reports are split into several parts, each with the full instructions."
         }
       }
     }

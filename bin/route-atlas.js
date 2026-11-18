@@ -8,6 +8,8 @@ const { findings } = require("../src/tree");
 const { FORMATS } = require("../src/exporters");
 const { checkAll, checkable, findServer } = require("../src/http");
 const { scanLinks } = require("../src/links");
+const { scanSecurity } = require("../src/security");
+const { toAiPrompt } = require("../src/ai-report");
 const { version } = require("../package.json");
 
 const HELP = `Route Atlas ${version}: every page and endpoint of a web project.
@@ -17,6 +19,7 @@ Usage
   route-atlas export <format> [dir]   Print routes as ${FORMATS.map((format) => format.id).join(", ")}
   route-atlas check [dir]             Call every plain GET route on a running server
   route-atlas lint [dir]              Report broken links, routes handled twice and admin routes without login check
+  route-atlas ai [dir]                Security findings as a ready-to-paste AI prompt in Markdown (secrets redacted)
 
 Options
   --json                 Machine-readable output (list, check, lint)
@@ -25,6 +28,7 @@ Options
   --laravel-runtime      Read registered Laravel routes with php artisan route:list (runs project code)
   --exclude <a,b>        More folder names to skip
   --ignore-link <regex>  Paths that lint should not report as broken (can be given more than once)
+  --max-chars <n>        ai: largest size of one prompt part (default 20000); -o writes file, file.part-2.md, ...
   --fail-on <status>     check: lowest HTTP status that counts as failure (default 500)
   --header <Name: value> check: header for every request (can be given more than once)
   --help, -h             Show this help
@@ -33,7 +37,7 @@ Options
 Exit codes: 0 fine, 1 problems found, 2 wrong usage.`;
 
 function parse(argv) {
-  const options = { positional: [], ignore: [], headers: {}, exclude: [], failOn: 500, laravelRuntime: false };
+  const options = { positional: [], ignore: [], headers: {}, exclude: [], failOn: 500, laravelRuntime: false, maxChars: 20000 };
   const value = (index, flag) => {
     if (index >= argv.length) throw new UsageError(`${flag} needs a value`);
     return argv[index];
@@ -70,6 +74,10 @@ function parse(argv) {
       case "--ignore-link":
         options.ignore.push(next());
         break;
+      case "--max-chars":
+        options.maxChars = Number(next());
+        if (!Number.isInteger(options.maxChars) || options.maxChars < 4000) throw new UsageError("--max-chars needs a number of at least 4000");
+        break;
       case "--fail-on":
         options.failOn = Number(next());
         if (!Number.isInteger(options.failOn)) throw new UsageError("--fail-on needs a number such as 400 or 500");
@@ -91,7 +99,7 @@ function parse(argv) {
 
 class UsageError extends Error {}
 
-const COMMANDS = new Set(["list", "export", "check", "lint"]);
+const COMMANDS = new Set(["list", "export", "check", "lint", "ai"]);
 
 function relative(root, file) {
   return path.relative(root, file).split(path.sep).join("/");
@@ -181,6 +189,23 @@ async function lint(root, routes, options) {
   return `${lines.join("\n")}\n\n${issues.length} problems`;
 }
 
+async function ai(root, routes, options) {
+  const parts = await toAiPrompt({
+    title: path.basename(root),
+    root,
+    routes,
+    routeIssues: findings(routes).filter((finding) => finding.type === "unprotected"),
+    findings: await scanSecurity(root, { exclude: options.exclude }),
+    maxChars: options.maxChars,
+  });
+  if (!options.out) return parts.join("\n\n<!-- route-atlas: next part -->\n\n");
+  const names = parts.map((_, index) => (index ? options.out.replace(/(\.md)?$/i, `.part-${index + 1}.md`) : options.out));
+  for (const [index, part] of parts.entries()) await fs.writeFile(names[index], part);
+  options.out = undefined;
+  options.quiet = true;
+  return `Wrote ${names.join(", ")}`;
+}
+
 class Problem extends Error {}
 
 async function main(argv) {
@@ -188,7 +213,7 @@ async function main(argv) {
   if (options.version) return { output: version, code: 0 };
   if (options.help) return { output: HELP, code: 0 };
   const command = COMMANDS.has(options.positional[0]) ? options.positional.shift() : "list";
-  const handler = { list, export: exportRoutes, check, lint }[command];
+  const handler = { list, export: exportRoutes, check, lint, ai }[command];
   if (command === "export") options.format = options.positional.shift();
   const root = path.resolve(options.positional.shift() || ".");
   if (options.positional.length) throw new UsageError(`Too many arguments: ${options.positional.join(" ")}`);
@@ -203,7 +228,7 @@ async function main(argv) {
     await fs.writeFile(options.out, output.endsWith("\n") ? output : `${output}\n`);
     return { output: `Wrote ${options.out}`, code: options.exitCode || 0, quiet: true };
   }
-  return { output, code: options.exitCode || 0 };
+  return { output, code: options.exitCode || 0, quiet: options.quiet };
 }
 
 if (require.main === module) {
