@@ -8,6 +8,8 @@ const { scanSecurity } = require("./security");
 const { summarizeLanguages } = require("./languages");
 const { dashboardHtml } = require("./dashboard");
 const { toSarif } = require("./sarif");
+const { toAiPrompt } = require("./ai-report");
+const { buildGraph, graphHtml } = require("./graph");
 const { MODES, findings, matchRoute } = require("./tree");
 const { FORMATS } = require("./exporters");
 const { scanLinks } = require("./links");
@@ -23,6 +25,12 @@ const FRAMEWORK_PORTS = {
 };
 const MODE_LABELS = { area: "Areas", path: "Path tree", file: "File", framework: "Framework", method: "HTTP method", access: "Access" };
 const SCHEME = "route-atlas";
+const GRAPH_LABELS = {
+  graph: "Route graph", properties: "Graph properties", nodes: "Nodes", edges: "Edges", charge: "Charge force",
+  toggleLabels: "Toggle node labels", force: "force", fit: "Fit to view", heatmap: "Security heatmap", aiPrompt: "Create AI prompt",
+  search: "Search", searchNodes: "Search nodes", clusters: "Clusters", shortcuts: "Keyboard shortcuts",
+  select: "(de)select hovered node", reset: "reset selection", fade: "fade unselected nodes", doubleClick: "Double-click opens the code",
+};
 
 function config() {
   return vscode.workspace.getConfiguration("routeAtlas");
@@ -178,6 +186,7 @@ function activate(context) {
       tree.refresh();
       lensChanged.fire();
       showState();
+      updateGraph();
     } finally {
       running = false;
       if (again) {
@@ -361,6 +370,113 @@ function activate(context) {
 
   const allRoutes = () => tree.results.flatMap((result) => result.routes.map((route) => ({ route, result })));
 
+  const scanSecurityAll = async () => {
+      if (!vscode.workspace.isTrusted) { vscode.window.showWarningMessage("Security scanning is disabled in Restricted Mode. Trust this workspace to scan its files."); return undefined; }
+      const folders = vscode.workspace.workspaceFolders || []; if (!folders.length) return undefined;
+      const findings = []; const languageStats = new Map(); let routeCount = 0;
+      await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Route Atlas: scanning project security", cancellable: false }, async () => {
+        for (const folder of folders) {
+          const files = await walk(folder.uri.fsPath, { exclude: config().get("exclude") || [] });
+          routeCount += (tree.results.find((item) => item.folder.uri.fsPath === folder.uri.fsPath)?.routes || []).length;
+          for (const item of summarizeLanguages(files)) languageStats.set(item.language, (languageStats.get(item.language) || 0) + item.files);
+          findings.push(...await scanSecurity(folder.uri.fsPath, { exclude: config().get("exclude") || [] }));
+        }
+      });
+      latestSecurityFindings = findings;
+      securityItems.splice(0, securityItems.length, ...findings.map((finding) => {
+        const relative = vscode.workspace.asRelativePath(finding.file);
+        const item = new vscode.TreeItem(`[${finding.severity.toUpperCase()}] ${finding.title}`, vscode.TreeItemCollapsibleState.None);
+        item.description = `${relative}:${finding.line}`;
+        item.tooltip = `${finding.title}\\nSeverity: ${finding.severity}\\nFile: ${relative}\\nLine: ${finding.line}\\n${finding.cwe} · ${finding.confidence} confidence\\n\\nClick to open this location.`;
+        item.iconPath = new vscode.ThemeIcon(finding.severity === "critical" || finding.severity === "high" ? "error" : finding.severity === "medium" ? "warning" : "info");
+        item.command = { command: "routeAtlas.openSecurityFinding", title: "Open finding", arguments: [finding] };
+        return item;
+      }));
+      securityEmitter.fire();
+      securityProblems.clear();
+      const grouped = new Map();
+      const severity = { critical: vscode.DiagnosticSeverity.Error, high: vscode.DiagnosticSeverity.Error, medium: vscode.DiagnosticSeverity.Warning, low: vscode.DiagnosticSeverity.Information };
+      for (const finding of findings) {
+        const uri = vscode.Uri.file(finding.file); const list = grouped.get(uri.toString()) || [];
+        const line = Math.max(0, finding.line - 1); const column = Math.max(0, finding.column);
+        const diagnostic = new vscode.Diagnostic(new vscode.Range(line, column, line, column + 1), finding.title + " (" + finding.cwe + "; " + finding.confidence + " confidence). Review manually; static detection can produce false positives.", severity[finding.severity] || vscode.DiagnosticSeverity.Warning);
+        diagnostic.source = "Route Atlas Security"; diagnostic.code = finding.id; list.push(diagnostic); grouped.set(uri.toString(), list);
+      }
+      for (const [uri, list] of grouped) securityProblems.set(vscode.Uri.parse(uri), list);
+      const languages = [...languageStats].map(([language, files]) => ({ language, files })).sort((a,b) => b.files-a.files);
+      updateGraph();
+      return { findings, languages, routeCount, folders };
+  };
+
+  /** Writes the AI prompt to .route-atlas/ so coding agents can read it, and copies part 1. */
+  const aiPrompt = async () => {
+    const scanned = await scanSecurityAll();
+    if (!scanned) return;
+    const [folder] = scanned.folders;
+    const root = folder.uri.fsPath;
+    const routeIssues = tree.results.flatMap((result) => findings(result.routes, config().get("categories")).filter((item) => item.type === "unprotected"));
+    const parts = await toAiPrompt({
+      title: scanned.folders.map((item) => item.name).join(", "),
+      root,
+      routes: tree.results.flatMap((result) => result.routes),
+      routeIssues,
+      findings: scanned.findings,
+      maxChars: config().get("aiPromptMaxChars", 20000),
+    });
+    const dir = path.join(root, ".route-atlas");
+    await fs.mkdir(dir, { recursive: true });
+    // Snippets stay local by default: the folder ignores itself in Git.
+    await fs.writeFile(path.join(dir, ".gitignore"), "*\n");
+    const names = parts.map((_, index) => (index ? `ai-security-prompt.part-${index + 1}.md` : "ai-security-prompt.md"));
+    for (const stale of (await fs.readdir(dir)).filter((name) => /^ai-security-prompt\.part-\d+\.md$/.test(name) && !names.includes(name))) {
+      await fs.unlink(path.join(dir, stale));
+    }
+    for (const [index, part] of parts.entries()) await fs.writeFile(path.join(dir, names[index]), part);
+    await vscode.window.showTextDocument(vscode.Uri.file(path.join(dir, names[0])), { preview: false });
+    for (let index = 0; index < parts.length; index++) {
+      await vscode.env.clipboard.writeText(parts[index]);
+      const next = t("Copy part {0}", index + 2);
+      const message = t("AI prompt part {0} of {1} copied ({2} characters). Saved in .route-atlas/.", index + 1, parts.length, parts[index].length);
+      if (index + 1 >= parts.length) { vscode.window.showInformationMessage(message); break; }
+      if ((await vscode.window.showInformationMessage(message, next)) !== next) break;
+    }
+  };
+
+  let graphPanel;
+  let graphTargets = new Map();
+  const graphData = () => {
+    const data = buildGraph({
+      results: tree.results.map((result) => ({ root: result.folder.uri.fsPath, name: result.folder.name, routes: result.routes })),
+      findings: latestSecurityFindings,
+      rules: config().get("categories"),
+    });
+    graphTargets = new Map(data.nodes.filter((node) => node.file).map((node) => [node.id, node]));
+    return { ...data, title: tree.results.map((result) => result.folder.name).join(", ") };
+  };
+  const updateGraph = () => graphPanel && graphPanel.webview.postMessage({ type: "data", data: graphData() });
+  const openGraph = () => {
+    if (graphPanel) return graphPanel.reveal();
+    const media = vscode.Uri.joinPath(context.extensionUri, "media");
+    graphPanel = vscode.window.createWebviewPanel("routeAtlas.graph", t("Route graph"), vscode.ViewColumn.Active, { enableScripts: true, localResourceRoots: [media], retainContextWhenHidden: true });
+    const labels = Object.fromEntries(Object.entries(GRAPH_LABELS).map(([key, text]) => [key, t(text)]));
+    graphPanel.webview.html = graphHtml({
+      data: graphData(),
+      labels,
+      nonce: require("crypto").randomBytes(16).toString("base64"),
+      scriptUri: graphPanel.webview.asWebviewUri(vscode.Uri.joinPath(media, "graph.js")),
+      cspSource: graphPanel.webview.cspSource,
+    });
+    graphPanel.webview.onDidReceiveMessage(async (message) => {
+      if (message && message.type === "aiPrompt") return aiPrompt();
+      // Only ids the extension handed out: the webview never chooses a file path itself.
+      const node = message && message.type === "open" && graphTargets.get(message.id);
+      if (!node) return;
+      const position = new vscode.Position(node.line || 0, 0);
+      await vscode.window.showTextDocument(vscode.Uri.file(node.file), { selection: new vscode.Range(position, position), viewColumn: vscode.ViewColumn.Beside });
+    });
+    graphPanel.onDidDispose(() => { graphPanel = undefined; });
+  };
+
   const watcher = vscode.workspace.createFileSystemWatcher("**/*.{py,js,jsx,mjs,cjs,ts,tsx,vue,svelte,astro,md,mdx,php,rb,java,kt,cs,go,rs,html,htm,swift,c,h,cc,cpp,cxx,hpp,m,mm,fs,fsx,vb,scala,groovy,dart,lua,pl,ex,exs,erl,hs,lhs,clj,cljs,r,jl,sql,sh,bash,zsh,ps1,css,scss,sass,less,json,jsonc,yaml,yml,toml,xml,graphql,gql,proto,tf,hcl,ipynb}");
   const command = (name, handler) => vscode.commands.registerCommand(`routeAtlas.${name}`, handler);
   context.subscriptions.push(
@@ -435,45 +551,17 @@ function activate(context) {
       editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
     }),
     command("securityScan", async () => {
-      if (!vscode.workspace.isTrusted) { vscode.window.showWarningMessage("Security scanning is disabled in Restricted Mode. Trust this workspace to scan its files."); return; }
-      const folders = vscode.workspace.workspaceFolders || []; if (!folders.length) return;
-      const findings = []; const languageStats = new Map(); let routeCount = 0;
-      await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Route Atlas: scanning project security", cancellable: false }, async () => {
-        for (const folder of folders) {
-          const files = await walk(folder.uri.fsPath, { exclude: config().get("exclude") || [] });
-          routeCount += (tree.results.find((item) => item.folder.uri.fsPath === folder.uri.fsPath)?.routes || []).length;
-          for (const item of summarizeLanguages(files)) languageStats.set(item.language, (languageStats.get(item.language) || 0) + item.files);
-          findings.push(...await scanSecurity(folder.uri.fsPath, { exclude: config().get("exclude") || [] }));
-        }
-      });
-      latestSecurityFindings = findings;
-      securityItems.splice(0, securityItems.length, ...findings.map((finding) => {
-        const relative = vscode.workspace.asRelativePath(finding.file);
-        const item = new vscode.TreeItem(`[${finding.severity.toUpperCase()}] ${finding.title}`, vscode.TreeItemCollapsibleState.None);
-        item.description = `${relative}:${finding.line}`;
-        item.tooltip = `${finding.title}\\nSeverity: ${finding.severity}\\nFile: ${relative}\\nLine: ${finding.line}\\n${finding.cwe} · ${finding.confidence} confidence\\n\\nClick to open this location.`;
-        item.iconPath = new vscode.ThemeIcon(finding.severity === "critical" || finding.severity === "high" ? "error" : finding.severity === "medium" ? "warning" : "info");
-        item.command = { command: "routeAtlas.openSecurityFinding", title: "Open finding", arguments: [finding] };
-        return item;
-      }));
-      securityEmitter.fire();
-      securityProblems.clear();
-      const grouped = new Map();
-      const severity = { critical: vscode.DiagnosticSeverity.Error, high: vscode.DiagnosticSeverity.Error, medium: vscode.DiagnosticSeverity.Warning, low: vscode.DiagnosticSeverity.Information };
-      for (const finding of findings) {
-        const uri = vscode.Uri.file(finding.file); const list = grouped.get(uri.toString()) || [];
-        const line = Math.max(0, finding.line - 1); const column = Math.max(0, finding.column);
-        const diagnostic = new vscode.Diagnostic(new vscode.Range(line, column, line, column + 1), finding.title + " (" + finding.cwe + "; " + finding.confidence + " confidence). Review manually; static detection can produce false positives.", severity[finding.severity] || vscode.DiagnosticSeverity.Warning);
-        diagnostic.source = "Route Atlas Security"; diagnostic.code = finding.id; list.push(diagnostic); grouped.set(uri.toString(), list);
-      }
-      for (const [uri, list] of grouped) securityProblems.set(vscode.Uri.parse(uri), list);
-      const languages = [...languageStats].map(([language, files]) => ({ language, files })).sort((a,b) => b.files-a.files);
+      const scanned = await scanSecurityAll();
+      if (!scanned) return;
+      const { findings, languages, routeCount, folders } = scanned;
       const panel = vscode.window.createWebviewPanel("routeAtlas.dashboard", "Route Atlas — Security & Project", vscode.ViewColumn.Beside, { enableScripts: false });
       panel.webview.html = dashboardHtml({ title: folders.map((folder) => folder.name).join(", "), routes: Array(routeCount), languages, findings });
       if (findings.length) await securityView.reveal(securityItems[0], { select: false, focus: true });
 
       vscode.window.showInformationMessage("Route Atlas: " + findings.length + " security indicators found. Review the Problems panel; findings are heuristic, not confirmed vulnerabilities.");
     }),
+    command("aiPrompt", aiPrompt),
+    command("graph", openGraph),
     command("dashboard", () => vscode.commands.executeCommand("routeAtlas.securityScan")),
     command("exportSecuritySarif", async () => {
       if (!latestSecurityFindings.length) {

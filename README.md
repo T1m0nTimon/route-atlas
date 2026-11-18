@@ -41,6 +41,21 @@ Open **Route Atlas → Security** in the left sidebar and click **Start security
 
 These checks are heuristic. They can produce false positives and cannot prove that a project is secure. Use dedicated tools such as CodeQL, Semgrep, dependency audits and secret scanners for deeper coverage. Runtime tests and active security testing are not performed automatically.
 
+### AI security prompt
+
+Run **Route Atlas: Create AI Security Prompt** (sparkle button in the Security view) to get a ready-to-paste Markdown prompt: what the AI should do, the attack surface, and every finding with a few lines of code. Part 1 is copied to the clipboard; a button copies the next part. Secrets, `.env` values, private keys and long tokens are replaced with `***` before anything is written.
+
+The prompt is split into parts of at most `routeAtlas.aiPromptMaxChars` characters (default 20000, about 5000 tokens), small enough for the chat box of every common AI. Each part repeats the instructions, so it works on its own. The files are saved as `.route-atlas/ai-security-prompt.md` (and `.part-2.md`, ...), so Claude Code, Copilot or Cursor in the same project can read them directly. The folder contains a `.gitignore`, so the snippets are not committed by accident.
+
+```bash
+npx github:T1m0nTimon/route-atlas ai                      # print the prompt
+npx github:T1m0nTimon/route-atlas ai . -o security.md    # write security.md, security.part-2.md, ...
+```
+
+### Route graph
+
+Run **Route Atlas: Open Route Graph** (graph button in the Routes view) for a force-directed map of the project: every area is a hub, routes hang below their parent route, and lines lead to the source files and the security findings in them. Colors follow the areas; hover a cluster in the legend to outline it. The sidebar shows node and edge counts and has buttons for labels, force, zoom, a security heatmap and the AI prompt, plus a search. Click to select, `Shift+S` (de)selects the node under the mouse, `Shift+F` fades everything else, `Shift+R` resets, and a double-click opens the code.
+
 Run **Route Atlas: Open Project Dashboard** for a visual summary of routes, detected languages and security indicators. After scanning, use **Route Atlas: Export Security Findings as SARIF** to create a SARIF 2.1.0 report for GitHub Code Scanning and compatible security platforms.
 
 ## Supported
@@ -111,6 +126,7 @@ The command is passed as an executable plus argument array (never through a shel
 | `routeAtlas.ignoreLinks` | Regular expressions for paths that are never reported, for example `^/api/` |
 | `routeAtlas.helpersFile` | Keep TypeScript route helpers in this file up to date, for example `src/routes.gen.ts` |
 | `routeAtlas.language` | `auto`, `en` or `de` |
+| `routeAtlas.aiPromptMaxChars` | Largest size of one AI prompt part, default 20000 characters |
 
 ## Privacy
 
